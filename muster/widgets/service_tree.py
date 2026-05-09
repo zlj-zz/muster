@@ -80,7 +80,7 @@ class ServiceTree(Tree):
         text.append("● ", Style(color=status_color))
         text.append(svc.name)
         if port_str:
-            text.append(port_str, Style(color="#6e7681"))
+            text.append(port_str, Style(color="#4a4a5c"))
         return text
 
     def refresh_node(self, svc: Service) -> None:

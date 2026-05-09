@@ -1,22 +1,28 @@
+/* ================================================================
+   muster TCSS — Warm orange accent with round corners
+   ================================================================ */
+
 Screen {
-    background: #0a0a0c;
-    align: center middle;
+    background: #0a0a0e;
 }
 
 #body {
     height: 100%;
+    padding: 2 3;
 }
 
+/* service tree */
 #service-tree {
     width: 28%;
     height: 100%;
-    border: solid #0c0c0e;
-    background: #0c0c0e;
-    padding: 0 0;
+    border: round #4a4a5c;
+    background: #111118;
+    padding: 1 1;
+    margin: 0 3 0 0;
 }
 
 #service-tree:focus {
-    border: solid #1a1a1e;
+    border: round #f97316;
 }
 
 Tree {
@@ -25,7 +31,8 @@ Tree {
 }
 
 Tree > .tree--cursor {
-    background: #264f78;
+    background: #2d1a0f;
+    text-style: bold;
 }
 
 Tree > .tree--highlight {
@@ -33,7 +40,7 @@ Tree > .tree--highlight {
 }
 
 .tree--guides {
-    color: #1e1e22;
+    color: #2a2a35;
 }
 
 #right-panel {
@@ -41,18 +48,22 @@ Tree > .tree--highlight {
     height: 100%;
 }
 
+/* status bar */
 #status-bar {
     height: 1;
-    background: #0a0a0c;
-    color: #52525b;
+    background: #0a0a0e;
+    color: #6e7681;
     padding: 0 1;
+    border: none;
 }
 
+/* detail */
 #detail {
     height: 35%;
-    background: #0c0c0e;
-    border: none;
+    border: round #4a4a5c;
+    background: #14141c;
     padding: 1;
+    margin: 0 0 3 0;
 }
 
 #detail-container {
@@ -63,6 +74,7 @@ Tree > .tree--highlight {
     height: 1fr;
 }
 
+/* buttons */
 #action-buttons {
     display: none;
     height: auto;
@@ -74,14 +86,15 @@ Tree > .tree--highlight {
     height: 3;
     padding: 0 2;
     margin: 0 1;
-    border: none;
-    background: transparent;
+    border: round #4a4a5c;
+    background: #1a1a22;
     color: #858585;
     content-align: center middle;
 }
 
 #action-buttons Button:hover {
-    background: #161618;
+    background: #24242c;
+    border: round #f97316;
 }
 
 #action-buttons Button#btn-start {
@@ -97,14 +110,18 @@ Tree > .tree--highlight {
 }
 
 #action-buttons Button:disabled {
-    color: #333333;
-    background: transparent;
+    color: #33333a;
+    background: #14141c;
+    border: round #2d2d3a;
 }
 
+/* log */
 #log {
     height: 1fr;
-    background: #0e0e10;
-    border: none;
+    border: round #4a4a5c;
+    background: #171720;
+    padding: 1;
+    margin: 3 0 0 0;
 }
 
 TextArea {
@@ -116,20 +133,22 @@ TextArea:focus {
     border: none;
 }
 
+/* footer */
 Footer {
-    background: #0a0a0c;
+    background: #0a0a0e;
     color: #52525b;
+    border: none;
 }
 
 Footer > .footer--highlight {
-    background: #1a1a1e;
+    background: #1f1f25;
+    color: #f97316;
 }
 
 Footer > .footer--highlight-key {
-    color: #858585;
+    color: #fdba74;
 }
 
 Footer > .footer--key {
     color: #6e7681;
 }
-
