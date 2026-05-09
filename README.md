@@ -1,5 +1,7 @@
 # muster
 
+[![Coverage](https://codecov.io/gh/zlj-zz/muster/branch/main/graph/badge.svg)](https://codecov.io/gh/zlj-zz/muster)
+
 A TUI-based service orchestrator for local development. Think of it as a mini dashboard for starting, stopping, and monitoring all the services in your project — directly in the terminal.
 
 <img width="978" alt="Image" src="https://github.com/user-attachments/assets/da43f353-be93-4183-b746-d2d551f8b8c6" />
