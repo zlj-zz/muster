@@ -28,7 +28,7 @@ class ActivityTab(Static):
     ActivityTab {
         width: 100%;
         height: 4;
-        content-align: center middle;
+        content-align: left middle;
         color: #5c6370;
         text-style: none;
         border-left: inner #21252b;
@@ -45,11 +45,14 @@ class ActivityTab(Static):
     }
     """
 
-    def __init__(self, tab_id: str, icon: str, label: str, **kwargs) -> None:
+    def __init__(
+        self, tab_id: str, icon: str, label: str, tooltip: str = "", **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.tab_id = tab_id
         self._icon = icon
         self._label = label
+        self.tooltip = tooltip
 
     def render(self) -> Text:
         """Return a vertically-stacked icon + label."""
@@ -102,9 +105,9 @@ class ActivityBar(Vertical):
 
     def compose(self) -> ComposeResult:
         """Yield the three default tabs."""
-        yield ActivityTab("svc", "■", "svc", id="tab-svc")
-        yield ActivityTab("env", "●", "env", id="tab-env")
-        yield ActivityTab("yaml", "☰", "yaml", id="tab-yaml")
+        yield ActivityTab("svc", " ▣", "svc", tooltip="Services [1]", id="tab-svc")
+        yield ActivityTab("env", " ◉", "env", tooltip="Environment [2]", id="tab-env")
+        yield ActivityTab("yaml", " ≡", "yaml", tooltip="YAML Files [3]", id="tab-yaml")
 
     def watch_active_tab(self, tab_id: str) -> None:
         """Update the ``active`` CSS class on child tabs."""

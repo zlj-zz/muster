@@ -48,6 +48,7 @@ class MusterApp(App):
     CSS_PATH = "app.tcss"
     SHOW_HEADER = False
     SHOW_FOOTER = False
+    TOOLTIP_DELAY = 0.15
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit"),
