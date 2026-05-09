@@ -2,6 +2,8 @@
 
 A TUI-based service orchestrator for local development. Think of it as a mini dashboard for starting, stopping, and monitoring all the services in your project — directly in the terminal.
 
+<img width="978" alt="Image" src="https://github.com/user-attachments/assets/da43f353-be93-4183-b746-d2d551f8b8c6" />
+
 ```bash
 pip install muster
 muster -f muster.yaml
@@ -12,7 +14,7 @@ muster -f muster.yaml
 - **Tree view** — services grouped by configurable categories (e.g., domain / aggregation / api)
 - **Dependency-aware startup** — auto-resolves and starts dependencies in the correct order
 - **Real-time logs** — per-service logs with auto-scroll and copy support
-- **Health checks** — TCP port checks (HTTP / process checks coming soon)
+- **Health checks** — TCP, HTTP, and process checks with latency measurement
 - **Environment monitoring** — live indicators for etcd, MySQL, Redis, or any custom dependency
 - **Multiple command modes** — each service can define `default`, `test`, `prod`, or any custom command map
 - **Port auto-discovery** — extract listening ports from your service config files
@@ -111,12 +113,46 @@ Define service groups. Each group gets its own section in the tree view.
 
 Define environment dependencies to monitor in the top status bar.
 
-| Field | Description |
-|-------|-------------|
-| `name` | Display name |
-| `type` | `tcp` (implemented) / `http` / `proc` (planned) |
-| `host` | TCP host (default: `127.0.0.1`) |
-| `port` | TCP port |
+| Field | Description | Applies to |
+|-------|-------------|------------|
+| `name` | Display name | all |
+| `type` | `tcp`, `http`, or `proc` | all |
+| `host` | TCP host (default: `127.0.0.1`) | `tcp` |
+| `port` | TCP port | `tcp` |
+| `url` | Full URL to request | `http` |
+| `method` | HTTP method (default: `GET`) | `http` |
+| `expect_status` | Expected HTTP status code (default: `200`) | `http` |
+| `pattern` | Regex pattern matched against process names | `proc` |
+
+**TCP example:**
+
+```yaml
+env_checks:
+  - name: postgres
+    type: tcp
+    host: 127.0.0.1
+    port: 5432
+```
+
+**HTTP example:**
+
+```yaml
+env_checks:
+  - name: api-health
+    type: http
+    url: http://127.0.0.1:8080/health
+    method: GET
+    expect_status: 200
+```
+
+**Process example:**
+
+```yaml
+env_checks:
+  - name: nginx
+    type: proc
+    pattern: nginx
+```
 
 ### `config.port_discovery`
 
