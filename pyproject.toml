@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "muster"
-version = "0.2.0"
+dynamic = ["version"]
 description = "A TUI-based service orchestrator for local development"
 readme = "README.md"
 license = { text = "MIT" }
@@ -25,6 +25,9 @@ dev = [
 [project.scripts]
 muster = "muster.__main__:main"
 
+[tool.hatch.version]
+path = "src/muster/__about__.py"
+
 [tool.hatch.build.targets.wheel]
-packages = ["muster"]
-include = ["muster/*.tcss"]
+packages = ["src/muster"]
+include = ["src/muster/*.tcss"]
