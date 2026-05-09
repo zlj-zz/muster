@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 
 
@@ -64,6 +65,11 @@ class EnvCheck:
     expect_status: int | None = None
     pattern: str | None = None
 
+    # runtime state
+    last_checked: datetime | None = None
+    latency_ms: int | None = None
+    consecutive_failures: int = 0
+
 
 @dataclass
 class PortDiscovery:
@@ -116,6 +122,9 @@ class Service:
     status: Status = Status.STOPPED
     proc: asyncio.subprocess.Process | None = None
     log_lines: list[str] = field(default_factory=list)
+    start_time: datetime | None = None
+    restart_count: int = 0
+    last_error: str | None = None
 
     def cmd_for(self, mode: str) -> str:
         """Return the command string for the given mode.

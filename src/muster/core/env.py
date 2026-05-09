@@ -7,11 +7,14 @@ and returns pass/fail results for display in the TUI status bar.
 from __future__ import annotations
 
 import socket
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 from ..models import EnvCheck
 
 
-def check_tcp(host: str, port: int, timeout: float = 1.0) -> bool:
+def check_tcp(host: str, port: int, timeout: float = 1.0) -> tuple[bool, int | None]:
     """Attempt a TCP connection to verify a host:port is reachable.
 
     Args:
@@ -20,18 +23,56 @@ def check_tcp(host: str, port: int, timeout: float = 1.0) -> bool:
         timeout: Connection timeout in seconds.
 
     Returns:
-        ``True`` if the connection succeeds, ``False`` otherwise.
+        A tuple of ``(is_reachable, latency_ms)``.  ``latency_ms`` is ``None``
+        when the connection fails.
     """
     try:
+        start = time.perf_counter()
         with socket.create_connection((host, port), timeout=timeout):
-            return True
+            latency_ms = int((time.perf_counter() - start) * 1000)
+            return True, latency_ms
     except OSError:
-        # OSError covers refused, timeout, unreachable, etc.
-        return False
+        return False, None
+
+
+def _check_one(ec: EnvCheck) -> tuple[str, bool]:
+    """Run a single environment check and update its runtime state.
+
+    Args:
+        ec: The check to run.
+
+    Returns:
+        ``(check_name, is_ok)`` tuple.
+    """
+    latency: int | None = None
+    if ec.type == "tcp":
+        ok, latency = (
+            check_tcp(ec.host or "127.0.0.1", ec.port or 0)
+            if ec.port
+            else (False, None)
+        )
+    elif ec.type == "http":
+        ok = False
+    elif ec.type == "proc":
+        ok = False
+    else:
+        ok = False
+
+    ec.last_checked = datetime.now()
+    ec.latency_ms = latency
+    if ok:
+        ec.consecutive_failures = 0
+    else:
+        ec.consecutive_failures += 1
+
+    return ec.name, ok
 
 
 def check_env(env_checks: list[EnvCheck]) -> list[tuple[str, bool]]:
-    """Run all configured environment checks and return (name, ok) pairs.
+    """Run all configured environment checks concurrently.
+
+    Updates each :class:`EnvCheck` in-place with ``last_checked``,
+    ``latency_ms``, and ``consecutive_failures``.
 
     Args:
         env_checks: List of checks to execute.
@@ -39,17 +80,5 @@ def check_env(env_checks: list[EnvCheck]) -> list[tuple[str, bool]]:
     Returns:
         Ordered list of ``(check_name, is_ok)`` tuples.
     """
-    results: list[tuple[str, bool]] = []
-    for ec in env_checks:
-        if ec.type == "tcp":
-            ok = check_tcp(ec.host or "127.0.0.1", ec.port or 0) if ec.port else False
-        elif ec.type == "http":
-            # TODO: implement HTTP health check (requests / urllib)
-            ok = False
-        elif ec.type == "proc":
-            # TODO: implement process pattern check (psutil or pgrep fallback)
-            ok = False
-        else:
-            ok = False
-        results.append((ec.name, ok))
-    return results
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        return list(executor.map(_check_one, env_checks))

@@ -1,23 +1,38 @@
 """Service detail panel with action buttons.
 
 Displays structured metadata for the currently selected service (name, group,
-status, port, dependencies, and command snippets) and provides ``Start``,
-``Stop``, ``Restart`` buttons whose disabled state tracks the service status.
+status, port, dependencies, runtime stats, and command snippets) and provides
+``Start``, ``Stop``, ``Restart`` buttons whose disabled state tracks the
+service status.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 
 from rich.syntax import Syntax
 from rich.text import Text
 from textual import on
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.reactive import reactive
-from textual.widgets import Button, DataTable, Static
+from textual.widgets import Button, Static
 
 from ..models import Group, Service, Status
+
+
+def _fmt_uptime(start: datetime | None) -> str:
+    """Format elapsed time since start."""
+    if start is None:
+        return "—"
+    delta = datetime.now() - start
+    total = int(delta.total_seconds())
+    if total < 60:
+        return f"{total}s"
+    if total < 3600:
+        return f"{total // 60}m {total % 60}s"
+    return f"{total // 3600}h {(total % 3600) // 60}m"
 
 
 class DetailPanel(Static):
@@ -37,10 +52,66 @@ class DetailPanel(Static):
         self._groups = groups
         self._status_colors = status_colors
         self.border_title = "Detail"
+        self._last_service: Service | None = None
+        self._cached_rows: list[Horizontal] | None = None
+        self._cached_buttons: tuple[Button, Button, Button] | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
-            yield DataTable(show_header=False, zebra_stripes=False, id="detail-content")
+            with VerticalScroll(id="detail-meta"):
+                yield Horizontal(
+                    Static("Name", classes="detail-key"),
+                    Static("", classes="detail-value"),
+                    classes="detail-row",
+                )
+                yield Horizontal(
+                    Static("Group", classes="detail-key"),
+                    Static("", classes="detail-value"),
+                    classes="detail-row",
+                )
+                yield Horizontal(
+                    Static("Status", classes="detail-key"),
+                    Static("", classes="detail-value"),
+                    classes="detail-row",
+                )
+                yield Horizontal(
+                    Static("Port", classes="detail-key"),
+                    Static("", classes="detail-value"),
+                    classes="detail-row",
+                )
+                yield Horizontal(
+                    Static("Deps", classes="detail-key"),
+                    Static("", classes="detail-value"),
+                    classes="detail-row",
+                )
+                yield Horizontal(
+                    Static("PID", classes="detail-key"),
+                    Static("", classes="detail-value"),
+                    classes="detail-row",
+                )
+                yield Horizontal(
+                    Static("Started", classes="detail-key"),
+                    Static("", classes="detail-value"),
+                    classes="detail-row",
+                )
+                yield Horizontal(
+                    Static("Uptime", classes="detail-key"),
+                    Static("", classes="detail-value"),
+                    classes="detail-row",
+                )
+                yield Horizontal(
+                    Static("Restarts", classes="detail-key"),
+                    Static("", classes="detail-value"),
+                    classes="detail-row",
+                )
+                yield Horizontal(
+                    Static("Last Error", classes="detail-key"),
+                    Static("", classes="detail-value"),
+                    classes="detail-row",
+                )
+                with Vertical(id="detail-command"):
+                    yield Static("Command", classes="detail-section-title")
+                    yield Static("", classes="detail-code")
             with Horizontal(id="action-buttons"):
                 yield Button.success("Start", flat=True, id="btn-start")
                 yield Button.error("Stop", flat=True, id="btn-stop")
@@ -52,7 +123,7 @@ class DetailPanel(Static):
         Re-renders metadata, updates button states, and shows/hides the button
         row depending on whether a service is selected.
         """
-        if getattr(self, "_last_service", None) is svc:
+        if self._last_service is svc:
             return
         self._last_service = svc
         self._render_detail(svc)
@@ -60,57 +131,66 @@ class DetailPanel(Static):
         buttons = self.query_one("#action-buttons", Horizontal)
         buttons.styles.display = "none" if svc is None else "block"
 
+    def refresh_content(self) -> None:
+        """Force a full re-render of the current service."""
+        self._render_detail(self.current_service)
+        self._update_buttons(self.current_service)
+
     def _render_detail(self, svc: Service | None) -> None:
         """Build and display the key/value metadata block.
 
         Args:
             svc: Service to render, or ``None`` to clear the panel.
         """
-        table = self.query_one("#detail-content", DataTable)
-        table.clear()
-
+        rows = self._cached_rows
+        if not rows:
+            rows = list(self.query(".detail-row").results(Horizontal))
+            self._cached_rows = rows
         if svc is None:
+            for row in rows:
+                row.styles.display = "none"
+            self.query_one("#detail-command", Vertical).styles.display = "none"
             return
 
-        # Ensure columns are defined once.
-        if not table.columns:
-            table.add_column("key", width=10)
-            table.add_column("value")
+        for row in rows:
+            row.styles.display = "block"
+        self.query_one("#detail-command", Vertical).styles.display = "block"
 
-        deps = ", ".join(svc.depends_on) if svc.depends_on else "none"
-        port = str(svc.port) if svc.port else "unresolved"
         group = next((g for g in self._groups if g.id == svc.group), None)
         group_color = group.color if group else "#cccccc"
         status_color = self._status_colors.get(svc.status.value, "#cccccc")
 
-        # Basic metadata rows.
-        table.add_row(Text("Name", style="dim bold"), Text(svc.name))
-        table.add_row(
-            Text("Group", style="dim bold"),
+        values = [
+            Text(svc.name),
             Text(group.label if group else svc.group, style=f"bold {group_color}"),
-        )
-        table.add_row(
-            Text("Status", style="dim bold"),
             Text(svc.status.value, style=f"bold {status_color}"),
-        )
-        table.add_row(Text("Port", style="dim bold"), Text(port))
-        table.add_row(Text("Deps", style="dim bold"), Text(deps))
+            Text(str(svc.port) if svc.port else "unresolved"),
+            Text(", ".join(svc.depends_on) if svc.depends_on else "none"),
+            Text(str(svc.proc.pid) if svc.proc else "—"),
+            Text(svc.start_time.strftime("%H:%M:%S") if svc.start_time else "—"),
+            Text(_fmt_uptime(svc.start_time)),
+            Text(str(svc.restart_count)),
+            Text(svc.last_error or "—", style="#e06c75" if svc.last_error else ""),
+        ]
 
-        # Command rows.
+        for row, value in zip(rows, values):
+            value_widget = row.query_one(".detail-value", Static)
+            value_widget.update(value)
+
+        # Command block
+        cmd = svc.cmd_for("default")
         if isinstance(svc.cmd, dict):
-            for mode, cmd in svc.cmd.items():
-                label = "Command" if mode == "default" else f"Command ({mode})"
-                self._add_command_block(table, label, cmd)
+            lines = []
+            for mode, c in svc.cmd.items():
+                label = f"$ {c}" if mode == "default" else f"$ {c}  # {mode}"
+                lines.append(label)
+            cmd_text = "\n".join(lines)
         else:
-            self._add_command_block(table, "Command", svc.cmd)
+            cmd_text = f"$ {cmd}"
 
-    def _add_command_block(self, table: DataTable, label: str, cmd: str) -> None:
-        """Add a command block (spacer + label + syntax) to the table."""
-        table.add_row("", "")
-        table.add_row(Text(label, style="bold"), "")
-        table.add_row(
-            "",
-            Syntax(cmd, "bash", theme="monokai", background_color="default"),
+        code_widget = self.query_one(".detail-code", Static)
+        code_widget.update(
+            Syntax(cmd_text, "bash", theme="monokai", background_color="default")
         )
 
     def _update_buttons(self, svc: Service | None) -> None:
@@ -119,9 +199,15 @@ class DetailPanel(Static):
         Args:
             svc: Currently selected service.
         """
-        start_btn = self.query_one("#btn-start", Button)
-        stop_btn = self.query_one("#btn-stop", Button)
-        restart_btn = self.query_one("#btn-restart", Button)
+        btns = self._cached_buttons
+        if not btns:
+            btns = (
+                self.query_one("#btn-start", Button),
+                self.query_one("#btn-stop", Button),
+                self.query_one("#btn-restart", Button),
+            )
+            self._cached_buttons = btns
+        start_btn, stop_btn, restart_btn = btns
 
         disabled = (True, True, True)
         if svc is not None:

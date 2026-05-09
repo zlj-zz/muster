@@ -92,9 +92,9 @@ Tree {
 }
 
 Tree > .tree--cursor {
-    background: #3e4451;
+    background: #264f78;
     text-style: bold;
-    color: auto;
+    color: #ffffff;
 }
 
 Tree > .tree--highlight {
@@ -132,22 +132,45 @@ Tree > .tree--highlight {
     overflow: hidden;
 }
 
-#detail-content {
+#detail-meta {
     height: 1fr;
-    border: none;
-    background: transparent;
+    padding: 0 1;
 }
 
-#detail-content .datatable--header {
-    display: none;
+.detail-row {
+    height: auto;
+    margin: 0;
 }
 
-#detail-content .datatable--cursor {
-    background: transparent;
+.detail-key {
+    width: 10;
+    color: #5c6370;
+    text-style: bold;
 }
 
-#detail-content .datatable--hover {
-    background: transparent;
+.detail-value {
+    width: 1fr;
+    color: #abb2bf;
+}
+
+#detail-command {
+    height: auto;
+    padding: 0 1;
+    margin-top: 1;
+}
+
+.detail-section-title {
+    height: auto;
+    color: #abb2bf;
+    text-style: bold;
+    margin-bottom: 0;
+}
+
+.detail-code {
+    height: auto;
+    background: #282c34;
+    padding: 0 1;
+    margin-top: 0;
 }
 
 /* action buttons */
@@ -166,33 +189,33 @@ Tree > .tree--highlight {
 }
 
 #action-buttons Button.-style-flat.-success {
-    background: #4caf50;
-    border: block #4caf50;
-    color: #ffffff;
+    background: #98c379;
+    border: block #98c379;
+    color: #1e2227;
 }
 #action-buttons Button.-style-flat.-success:hover {
-    background: #66bb6a;
-    border: block #66bb6a;
+    background: #a5d48a;
+    border: block #a5d48a;
 }
 
 #action-buttons Button.-style-flat.-error {
-    background: #f44336;
-    border: block #f44336;
-    color: #ffffff;
+    background: #e06c75;
+    border: block #e06c75;
+    color: #1e2227;
 }
 #action-buttons Button.-style-flat.-error:hover {
-    background: #ef5350;
-    border: block #ef5350;
+    background: #ec8088;
+    border: block #ec8088;
 }
 
 #action-buttons Button.-style-flat.-warning {
-    background: #ff9800;
-    border: block #ff9800;
-    color: #ffffff;
+    background: #e5c07b;
+    border: block #e5c07b;
+    color: #1e2227;
 }
 #action-buttons Button.-style-flat.-warning:hover {
-    background: #ffa726;
-    border: block #ffa726;
+    background: #efd08f;
+    border: block #efd08f;
 }
 
 #action-buttons Button:disabled {
@@ -262,9 +285,9 @@ TextArea:focus {
 /* Textual uses `scrollbar-color` and `scrollbar-background` properties
    on the PARENT container (Tree, TextArea, etc.), not on ScrollBar itself. */
 Tree, TextArea, VerticalScroll, DataTable {
-    scrollbar-color: #5c6370;
+    scrollbar-color: #7a8295;
     scrollbar-background: transparent;
-    scrollbar-color-hover: #7a8295;
+    scrollbar-color-hover: #abb2bf;
     scrollbar-background-hover: transparent;
     scrollbar-color-active: #e5a23e;
     scrollbar-background-active: transparent;

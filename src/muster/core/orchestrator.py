@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+from datetime import datetime
 from pathlib import Path
 from collections.abc import Callable
 
@@ -224,6 +225,7 @@ class ServiceOrchestrator:
                 executable=shell,
             )
             svc.proc = proc
+            svc.start_time = datetime.now()
             pid_msg = f">>> Process PID: {proc.pid}"
             svc.log_lines.append(pid_msg)
             self._log(svc.name, pid_msg)
@@ -280,6 +282,7 @@ class ServiceOrchestrator:
                 print(f"stop_service failed for {svc.name}: {e}", file=sys.stderr)
 
         svc.proc = None
+        svc.start_time = None
         self._set_status(svc, Status.STOPPED)
         stopped_msg = ">>> Service stopped"
         svc.log_lines.append(stopped_msg)
@@ -293,6 +296,7 @@ class ServiceOrchestrator:
             svc: Service to restart.
             mode: Command mode key.
         """
+        svc.restart_count += 1
         await self.stop(svc)
         await asyncio.sleep(0.5)
         await self.start_with_deps(svc, mode)
@@ -365,6 +369,7 @@ class ServiceOrchestrator:
             self._log(svc.name, exit_msg)
 
             if returncode != 0 and svc.status != Status.STOPPED:
+                svc.last_error = f"exit code {returncode}"
                 self._set_status(svc, Status.FAILED)
                 self._notify(
                     f"{svc.name} process exited abnormally (code={returncode})", "error"

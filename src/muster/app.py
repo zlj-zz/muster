@@ -288,6 +288,11 @@ class MusterApp(App):
             # Refresh env list in env tab
             self.query_one("#env-list", EnvList).refresh_checks(results)
 
+            # Refresh env detail panel if visible
+            detail = self.query_one("#right-env", EnvDetailPanel)
+            if detail.current_env is not None:
+                detail.refresh_content()
+
             # Refresh mode badge
             self.query_one("#footer-mode", Static).update(self._mode_label())
         except Exception as e:
@@ -306,7 +311,7 @@ class MusterApp(App):
             tree.refresh_node(svc)
             detail = self.query_one("#detail", DetailPanel)
             if detail.current_service is svc:
-                detail.watch_current_service(svc)
+                detail.refresh_content()
         except Exception as exc:
             self.log.error(f"refresh_list_item failed: {exc}")
 

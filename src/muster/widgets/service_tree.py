@@ -74,12 +74,14 @@ class ServiceTree(Tree):
             A ``Text`` instance with status dot, name, and port.
         """
         status_color = self.status_colors.get(svc.status.value, "#6e7681")
-        port_str = f" :{svc.port}" if svc.port else ""
         text = Text()
+        # 2-space gap after dot so it does not visually merge with the name.
         text.append("● ", Style(color=status_color))
         text.append(svc.name)
-        if port_str:
-            text.append(port_str, Style(color="#4a4a5c"))
+        if svc.port:
+            # 2-space gap before port, dim but visible on dark backgrounds.
+            text.append(" ", Style(color="#3e4451"))
+            text.append(f":{svc.port}", Style(color="#6e7681"))
         return text
 
     def refresh_node(self, svc: Service) -> None:

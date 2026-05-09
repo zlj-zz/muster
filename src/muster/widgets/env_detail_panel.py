@@ -6,6 +6,8 @@ most recent test results.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.reactive import reactive
@@ -32,9 +34,22 @@ class EnvDetailPanel(Static):
         """Build the widget hierarchy."""
         yield Static(id="env-detail-content")
 
+    def refresh_content(self) -> None:
+        """Force a full re-render of the current env check."""
+        self._render_detail(self.current_env)
+
     def watch_current_env(self, env: EnvCheck | None) -> None:
         """React to env check selection changes."""
         self._render_detail(env)
+
+    @staticmethod
+    def _latency_style(ms: int) -> str:
+        """Return a colour for the given latency in milliseconds."""
+        if ms < 50:
+            return "#98c379"
+        if ms < 200:
+            return "#e5c07b"
+        return "#e06c75"
 
     def _render_detail(self, env: EnvCheck | None) -> None:
         """Build and display the key/value metadata block.
@@ -66,5 +81,29 @@ class EnvDetailPanel(Static):
             kv("Port", str(env.port) if env.port else "N/A"),
             kv("Address", addr),
         ]
+
+        # --- runtime state ---
+        if env.last_checked is not None:
+            delta = datetime.now() - env.last_checked
+            seconds = int(delta.total_seconds())
+            if seconds < 1:
+                checked = "just now"
+            elif seconds < 60:
+                checked = f"{seconds}s ago"
+            else:
+                checked = f"{seconds // 60}m {seconds % 60}s ago"
+            lines.append(kv("Checked", checked, "dim"))
+
+        if env.latency_ms is not None:
+            lines.append(
+                kv(
+                    "Latency",
+                    f"{env.latency_ms}ms",
+                    self._latency_style(env.latency_ms),
+                )
+            )
+
+        if env.consecutive_failures > 0:
+            lines.append(kv("Failures", str(env.consecutive_failures), "#e06c75 bold"))
 
         content.update(Text("\n").join(lines))
