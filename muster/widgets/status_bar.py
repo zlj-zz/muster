@@ -43,7 +43,7 @@ class StatusBar(Static):
         Args:
             mode: Mode string (e.g. ``"DEFAULT | ALL"``).
         """
-        self._mode_text = f"[dim]{mode}[/]"
+        self._mode_text = f"[bold #ffffff on #f97316] {mode} [/bold #ffffff on #f97316]"
         self._update_display()
 
     def _update_display(self) -> None:

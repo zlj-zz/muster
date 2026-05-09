@@ -39,6 +39,7 @@ class ServiceTree(Tree):
         self._node_map: Dict[str, Tree.TreeNode] = {}
         self.show_root = False
         self.guide_depth = 2
+        self.border_title = Text("Services", style="bold white")
         self._build_tree()
 
     def _build_tree(self) -> None:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from rich.text import Text
 from textual.widgets import TextArea
 
 from ..models import Service
@@ -21,7 +22,7 @@ class LogPanel(TextArea):
         self._svc_name: Optional[str] = None
 
     def on_mount(self) -> None:
-        self.border_title = "Logs"
+        self.border_title = Text("Logs", style="bold white")
         self.cursor_blink = False
 
     def set_service(self, svc: Optional[Service]) -> None:
@@ -33,11 +34,11 @@ class LogPanel(TextArea):
         self.clear()
         if svc is None:
             self._svc_name = None
-            self.border_title = "Logs"
+            self.border_title = Text("Logs", style="bold white")
             return
 
         self._svc_name = svc.name
-        self.border_title = f"Logs: {svc.name}"
+        self.border_title = Text(f"Logs: {svc.name}", style="bold white")
         if svc.log_lines:
             self.text = "\n".join(svc.log_lines)
             self.move_cursor((len(svc.log_lines) - 1, 0))

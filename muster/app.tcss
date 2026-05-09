@@ -8,17 +8,17 @@ Screen {
 
 #body {
     height: 100%;
-    padding: 2 3;
+    padding: 1 2;
 }
 
 /* service tree */
 #service-tree {
     width: 28%;
     height: 100%;
-    border: round #4a4a5c;
-    background: #111118;
+    border: round #7c3a1a;
+    background: #0a0a0e;
     padding: 1 1;
-    margin: 0 3 0 0;
+    margin: 0 1 0 0;
 }
 
 #service-tree:focus {
@@ -60,10 +60,10 @@ Tree > .tree--highlight {
 /* detail */
 #detail {
     height: 35%;
-    border: round #4a4a5c;
-    background: #14141c;
+    border: round #7c3a1a;
+    background: #0a0a0e;
     padding: 1;
-    margin: 0 0 3 0;
+    margin: 0 0 1 0;
 }
 
 #detail-container {
@@ -86,14 +86,14 @@ Tree > .tree--highlight {
     height: 3;
     padding: 0 2;
     margin: 0 1;
-    border: round #4a4a5c;
-    background: #1a1a22;
+    border: round #7c3a1a;
+    background: #0a0a0e;
     color: #858585;
     content-align: center middle;
 }
 
 #action-buttons Button:hover {
-    background: #24242c;
+    background: #111118;
     border: round #f97316;
 }
 
@@ -111,17 +111,17 @@ Tree > .tree--highlight {
 
 #action-buttons Button:disabled {
     color: #33333a;
-    background: #14141c;
+    background: #0a0a0e;
     border: round #2d2d3a;
 }
 
 /* log */
 #log {
     height: 1fr;
-    border: round #4a4a5c;
-    background: #171720;
+    border: round #7c3a1a;
+    background: #0a0a0e;
     padding: 1;
-    margin: 3 0 0 0;
+    margin: 1 0 0 0;
 }
 
 TextArea {

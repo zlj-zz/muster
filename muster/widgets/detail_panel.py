@@ -57,6 +57,7 @@ class DetailPanel(Static):
         super().__init__(**kwargs)
         self._groups = groups
         self._status_colors = status_colors
+        self.border_title = Text("Detail", style="bold white")
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
