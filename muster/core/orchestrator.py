@@ -119,9 +119,7 @@ class ServiceOrchestrator:
 
         # Build launch plan: one layer per group, ordered by group.order.
         order_map = {g.id: g.order for g in self.config.groups}
-        layers = sorted(
-            set(d.group for d in deps), key=lambda g: order_map.get(g, 999)
-        )
+        layers = sorted(set(d.group for d in deps), key=lambda g: order_map.get(g, 999))
         self._log(svc.name, f">>> Groups: {layers}")
 
         for layer in layers:
@@ -148,12 +146,14 @@ class ServiceOrchestrator:
                         except OSError:
                             pass
                     self._log(
-                        svc.name, f">>> Scheduling start: {s.name} (status: {s.status.value})"
+                        svc.name,
+                        f">>> Scheduling start: {s.name} (status: {s.status.value})",
                     )
                     asyncio.create_task(self.start(s, mode))
                 else:
                     self._log(
-                        svc.name, f">>> Skipping start: {s.name} (status: {s.status.value})"
+                        svc.name,
+                        f">>> Skipping start: {s.name} (status: {s.status.value})",
                     )
 
             # Wait for the whole layer to reach a terminal state.
@@ -166,7 +166,8 @@ class ServiceOrchestrator:
                     self._log(svc.name, f">>> {s.name} already running, skip wait")
                     continue
                 self._log(
-                    svc.name, f">>> Waiting for {s.name} ready (current: {s.status.value})..."
+                    svc.name,
+                    f">>> Waiting for {s.name} ready (current: {s.status.value})...",
                 )
                 for _ in range(180):
                     if s.status == Status.RUNNING:
@@ -230,9 +231,7 @@ class ServiceOrchestrator:
             self._reader_tasks[svc.name] = asyncio.create_task(
                 self._read_output(svc, proc, logfile)
             )
-            self._health_tasks[svc.name] = asyncio.create_task(
-                self._wait_process(svc)
-            )
+            self._health_tasks[svc.name] = asyncio.create_task(self._wait_process(svc))
             asyncio.create_task(self._health_check(svc))
         except Exception as e:
             err_msg = f"!!! Start error: {e}"
@@ -402,22 +401,16 @@ class ServiceOrchestrator:
                     self._log(svc.name, ">>> Process exited, health check failed")
                     return
                 try:
-                    with socket.create_connection(
-                        ("127.0.0.1", port), timeout=1.0
-                    ):
+                    with socket.create_connection(("127.0.0.1", port), timeout=1.0):
                         self._set_status(svc, Status.RUNNING)
                         svc.port = port
                         self._log(svc.name, f">>> Service ready (port {port})")
-                        self._notify(
-                            f"{svc.name} ready (:{port})", "success"
-                        )
+                        self._notify(f"{svc.name} ready (:{port})", "success")
                         return
                 except OSError:
                     pass
                 if i % 5 == 0:
-                    self._log(
-                        svc.name, f">>> Waiting for port {port} ready... ({i}s)"
-                    )
+                    self._log(svc.name, f">>> Waiting for port {port} ready... ({i}s)")
                 await asyncio.sleep(1)
 
             self._set_status(svc, Status.FAILED)

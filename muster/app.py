@@ -8,24 +8,36 @@ bindings, and widget coordination, but delegates all process lifecycle work to
 from __future__ import annotations
 
 import asyncio
+import glob
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer
+from textual.widgets import ContentSwitcher, Static
 
 from .core.env import check_env
 from .core.orchestrator import ServiceOrchestrator
 from .models import Group, MusterConfig, Service, Status
-from .widgets import DetailPanel, LogPanel, ServiceTree, StatusBar
+from .widgets import (
+    ActivityBar,
+    DetailPanel,
+    EnvDetailPanel,
+    EnvIndicator,
+    EnvList,
+    FileList,
+    LogPanel,
+    ServiceTree,
+    YamlPreview,
+)
 
 
 class MusterApp(App):
-    """TUI service orchestrator.
+    """TUI service orchestrator with Activity Bar layout.
 
-    Manages the four-panel layout (service tree, status bar, detail panel,
-    log panel) and forwards user actions to ``ServiceOrchestrator``.
+    Manages the three-column layout (activity bar, left panel, right panel)
+    and forwards user actions to ``ServiceOrchestrator``.
 
     Attributes:
         all_services: Full list of services loaded from config.
@@ -34,6 +46,8 @@ class MusterApp(App):
     """
 
     CSS_PATH = "app.tcss"
+    SHOW_HEADER = False
+    SHOW_FOOTER = False
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
@@ -44,6 +58,9 @@ class MusterApp(App):
         Binding("R", "restart_service", "Restart"),
         Binding("t", "cycle_cmd_mode", "Mode"),
         Binding("l", "cycle_group", "Filter Group"),
+        Binding("1", "switch_tab('svc')", "Svc", show=False),
+        Binding("2", "switch_tab('env')", "Env", show=False),
+        Binding("3", "switch_tab('yaml')", "Yaml", show=False),
         Binding("j,down", "cursor_down", "Down", show=False),
         Binding("k,up", "cursor_up", "Up", show=False),
     ]
@@ -53,6 +70,7 @@ class MusterApp(App):
         config: MusterConfig,
         services: List[Service],
         registry: Dict[str, Service],
+        config_path: Optional[Path] = None,
         cmd_mode: str = "default",
         **kwargs,
     ) -> None:
@@ -60,6 +78,7 @@ class MusterApp(App):
         self._muster_config = config
         self.all_services = services
         self.registry = registry
+        self._config_path = config_path
         self.cmd_mode = cmd_mode
         self._group_filter: Optional[str] = None
         self._cleaned_up = False
@@ -70,6 +89,15 @@ class MusterApp(App):
             on_status=self._refresh_list_item,
             on_notify=lambda msg, sev: self.notify(msg, severity=sev),
         )
+        self._yaml_files = self._scan_yaml_files()
+
+    def _scan_yaml_files(self) -> List[str]:
+        """Scan for YAML files in the config directory."""
+        if self._config_path is None:
+            return []
+        yaml_dir = self._config_path.parent
+        files = sorted(glob.glob(str(yaml_dir / "*.yaml")))
+        return [Path(f).name for f in files]
 
     @property
     def _common_cmd_modes(self) -> List[str]:
@@ -90,32 +118,64 @@ class MusterApp(App):
 
     def compose(self) -> ComposeResult:
         """Build the widget hierarchy."""
-        with Horizontal(id="body"):
-            yield ServiceTree(
-                self._filtered_services(),
-                self._muster_config.groups,
-                self._muster_config.status_colors,
-                id="service-tree",
-            )
-            with Vertical(id="right-panel"):
-                yield StatusBar(self._muster_config, id="status-bar")
-                yield DetailPanel(
-                    self._muster_config.groups,
-                    self._muster_config.status_colors,
-                    id="detail",
-                )
-                yield LogPanel(id="log")
-        yield Footer()
+        with Vertical(id="main"):
+            with Horizontal(id="body"):
+                yield ActivityBar(id="activity-bar")
+
+                with ContentSwitcher(initial="left-svc", id="left-content"):
+                    with Vertical(id="left-svc"):
+                        yield ServiceTree(
+                            self._filtered_services(),
+                            self._muster_config.groups,
+                            self._muster_config.status_colors,
+                            id="service-tree",
+                        )
+                        yield EnvIndicator(self._muster_config, id="env-indicator")
+                    with Vertical(id="left-env"):
+                        yield EnvList(self._muster_config, id="env-list")
+                    with Vertical(id="left-yaml"):
+                        yield FileList(self._yaml_files, id="file-list")
+
+                with ContentSwitcher(initial="right-svc", id="right-content"):
+                    with Vertical(id="right-svc"):
+                        yield DetailPanel(
+                            self._muster_config.groups,
+                            self._muster_config.status_colors,
+                            id="detail",
+                        )
+                        yield LogPanel(id="log")
+                    yield EnvDetailPanel(id="right-env")
+                    yield YamlPreview(id="right-yaml")
+
+            # Custom footer bar with shortcut hints and mode badge
+            with Horizontal(id="footer-bar"):
+                yield Static(self._footer_text(), id="footer-keys")
+                yield Static(self._mode_label(), id="footer-mode")
+
+    def _footer_text(self) -> str:
+        """Build the footer shortcut hint text with Rich markup."""
+        return (
+            "[#e5a23e]q[/] quit  "
+            "[#e5a23e]r[/] refresh  "
+            "[#e5a23e]a[/] start-all  "
+            "[#e5a23e]s[/] stop-all  "
+            "[#e5a23e]enter[/] toggle  "
+            "[#e5a23e]R[/] restart  "
+            "[#e5a23e]t[/] mode  "
+            "[#e5a23e]l[/] filter"
+        )
 
     def on_mount(self) -> None:
         """Initialise the UI after widgets are mounted.
 
-        Auto-selects the first service so that the detail and log panels are
+        Auto-selects the first item in each tab so that panels are
         never empty on startup.
         """
         self.title = "muster"
         self._refresh_env_status()
         self.set_interval(5, self._refresh_env_status)
+
+        # svc tab: auto-select first service
         tree = self.query_one("#service-tree", ServiceTree)
         if tree.services:
             for group_node in tree.root.children:
@@ -126,8 +186,20 @@ class MusterApp(App):
                     break
         self._update_detail()
 
+        # env tab: auto-select first env check
+        env_list = self.query_one("#env-list", EnvList)
+        if env_list.root.children:
+            env_list.select_node(env_list.root.children[0])
+            self._update_env_detail()
+
+        # yaml tab: auto-select first file
+        file_list = self.query_one("#file-list", FileList)
+        if file_list.root.children:
+            file_list.select_node(file_list.root.children[0])
+            self._update_yaml_preview()
+
     def _mode_label(self) -> str:
-        """Build the subtitle string shown in the header.
+        """Build the subtitle string shown in the mode badge.
 
         Returns:
             String like ``"DEFAULT | ALL"`` or ``"TEST | DOMAIN"``.
@@ -189,12 +261,35 @@ class MusterApp(App):
         except Exception as e:
             self.log.error(f"update_detail failed: {e}")
 
+    def _update_env_detail(self) -> None:
+        """Synchronise EnvDetailPanel with the current env list selection."""
+        env_list = self.query_one("#env-list", EnvList)
+        env = env_list.current_env
+        self.query_one("#right-env", EnvDetailPanel).current_env = env
+
+    def _update_yaml_preview(self) -> None:
+        """Synchronise YamlPreview with the current file list selection."""
+        file_list = self.query_one("#file-list", FileList)
+        file_path = file_list.current_file
+        if file_path and self._config_path:
+            full_path = str(self._config_path.parent / file_path)
+            self.query_one("#right-yaml", YamlPreview).current_file = full_path
+        else:
+            self.query_one("#right-yaml", YamlPreview).current_file = None
+
     def _refresh_env_status(self) -> None:
-        """Poll environment checks and refresh the status bar."""
+        """Poll environment checks and refresh all indicators."""
         try:
-            bar = self.query_one("#status-bar", StatusBar)
-            bar.refresh_status()
-            bar.set_mode(self._mode_label())
+            results = check_env(self._muster_config.env_checks)
+
+            # Refresh env indicator strip in svc tab
+            self.query_one("#env-indicator", EnvIndicator).refresh_indicators(results)
+
+            # Refresh env list in env tab
+            self.query_one("#env-list", EnvList).refresh_checks(results)
+
+            # Refresh mode badge
+            self.query_one("#footer-mode", Static).update(self._mode_label())
         except Exception as e:
             self.log.error(f"refresh env status failed: {e}")
 
@@ -217,11 +312,23 @@ class MusterApp(App):
 
     # ---------- event handlers ----------
 
+    def on_activity_tab_tab_clicked(self, event: ActivityTab.TabClicked) -> None:
+        """Switch tabs when an activity bar tab is clicked."""
+        self.action_switch_tab(event.tab_id)
+
     def on_service_tree_service_highlighted(
         self, event: ServiceTree.ServiceHighlighted
     ) -> None:
         """Update detail/log panels when the user highlights a new service."""
         self._update_detail()
+
+    def on_env_list_env_highlighted(self, event: EnvList.EnvHighlighted) -> None:
+        """Update env detail panel when the user highlights a new env check."""
+        self._update_env_detail()
+
+    def on_file_list_file_highlighted(self, event: FileList.FileHighlighted) -> None:
+        """Update yaml preview when the user highlights a new file."""
+        self._update_yaml_preview()
 
     def on_detail_panel_action_triggered(
         self, event: DetailPanel.ActionTriggered
@@ -236,6 +343,16 @@ class MusterApp(App):
             asyncio.create_task(self._orchestrator.restart(svc, self.cmd_mode))
 
     # ---------- actions ----------
+
+    def action_switch_tab(self, tab: str) -> None:
+        """Switch to the specified activity tab."""
+        # Update activity bar visual state
+        activity_bar = self.query_one("#activity-bar", ActivityBar)
+        activity_bar.active_tab = tab
+
+        # Update left and right content switchers
+        self.query_one("#left-content", ContentSwitcher).current = f"left-{tab}"
+        self.query_one("#right-content", ContentSwitcher).current = f"right-{tab}"
 
     def action_cursor_down(self) -> None:
         """Move tree cursor down and update detail panel."""
@@ -264,7 +381,9 @@ class MusterApp(App):
         """Start every service in the current group filter."""
         for svc in self._filtered_services():
             if svc.status != Status.RUNNING:
-                asyncio.create_task(self._orchestrator.start_with_deps(svc, self.cmd_mode))
+                asyncio.create_task(
+                    self._orchestrator.start_with_deps(svc, self.cmd_mode)
+                )
         self.notify("Starting all services...", severity="information")
 
     def action_stop_all(self) -> None:

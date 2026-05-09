@@ -162,9 +162,9 @@ class MusterConfig:
     port_discovery: PortDiscovery
     status_colors: Dict[str, str] = field(
         default_factory=lambda: {
-            "stopped": "#6e7681",
-            "starting": "#dcdcaa",
-            "running": "#4ec9b0",
-            "failed": "#f44747",
+            "stopped": "#5c6370",
+            "starting": "#e5c07b",
+            "running": "#98c379",
+            "failed": "#e06c75",
         }
     )

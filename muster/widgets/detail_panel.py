@@ -9,36 +9,15 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from rich.console import Console, ConsoleOptions, RenderResult, RenderableType
-from rich.segment import Segment
 from rich.syntax import Syntax
 from rich.text import Text
 from textual import on
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.reactive import reactive
-from textual.widgets import Button, Static
+from textual.widgets import Button, DataTable, Static
 
 from ..models import Group, Service, Status
-
-
-class VStack:
-    """Vertically stack multiple Rich renderables with blank-line separators.
-
-    Replaces Rich's ``Group`` which has a hard positional-argument limit in
-    newer versions.
-    """
-
-    def __init__(self, items: list[RenderableType]) -> None:
-        self.items = items
-
-    def __rich_console__(
-        self, console: Console, options: ConsoleOptions
-    ) -> RenderResult:
-        for i, item in enumerate(self.items):
-            if i > 0:
-                yield Segment.line()
-            yield from console.render(item, options)
 
 
 class DetailPanel(Static):
@@ -57,15 +36,15 @@ class DetailPanel(Static):
         super().__init__(**kwargs)
         self._groups = groups
         self._status_colors = status_colors
-        self.border_title = Text("Detail", style="bold white")
+        self.border_title = "Detail"
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
-            yield Static(id="detail-content")
+            yield DataTable(show_header=False, zebra_stripes=False, id="detail-content")
             with Horizontal(id="action-buttons"):
-                yield Button("Start", id="btn-start")
-                yield Button("Stop", id="btn-stop")
-                yield Button("Restart", id="btn-restart")
+                yield Button.success("Start", flat=True, id="btn-start")
+                yield Button.error("Stop", flat=True, id="btn-stop")
+                yield Button.warning("Restart", flat=True, id="btn-restart")
 
     def watch_current_service(self, svc: Optional[Service]) -> None:
         """React to service selection changes.
@@ -73,6 +52,9 @@ class DetailPanel(Static):
         Re-renders metadata, updates button states, and shows/hides the button
         row depending on whether a service is selected.
         """
+        if getattr(self, "_last_service", None) is svc:
+            return
+        self._last_service = svc
         self._render_detail(svc)
         self._update_buttons(svc)
         buttons = self.query_one("#action-buttons", Horizontal)
@@ -84,10 +66,16 @@ class DetailPanel(Static):
         Args:
             svc: Service to render, or ``None`` to clear the panel.
         """
-        content = self.query_one("#detail-content", Static)
+        table = self.query_one("#detail-content", DataTable)
+        table.clear()
+
         if svc is None:
-            content.update("")
             return
+
+        # Ensure columns are defined once.
+        if not table.columns:
+            table.add_column("key", width=10)
+            table.add_column("value")
 
         deps = ", ".join(svc.depends_on) if svc.depends_on else "none"
         port = str(svc.port) if svc.port else "unresolved"
@@ -95,41 +83,35 @@ class DetailPanel(Static):
         group_color = group.color if group else "#cccccc"
         status_color = self._status_colors.get(svc.status.value, "#cccccc")
 
-        def kv(key: str, value: str, value_style: str = "") -> Text:
-            """Helper to build a single aligned key/value line."""
-            line = Text()
-            line.append(f"{key:<8} ", style="dim bold")
-            if value_style:
-                line.append(value, style=value_style)
-            else:
-                line.append(value)
-            return line
+        # Basic metadata rows.
+        table.add_row(Text("Name", style="dim bold"), Text(svc.name))
+        table.add_row(
+            Text("Group", style="dim bold"),
+            Text(group.label if group else svc.group, style=f"bold {group_color}"),
+        )
+        table.add_row(
+            Text("Status", style="dim bold"),
+            Text(svc.status.value, style=f"bold {status_color}"),
+        )
+        table.add_row(Text("Port", style="dim bold"), Text(port))
+        table.add_row(Text("Deps", style="dim bold"), Text(deps))
 
-        lines: List[Text | Syntax] = [
-            kv("Name", svc.name),
-            kv("Group", group.label if group else svc.group, f"bold {group_color}"),
-            kv("Status", svc.status.value, f"bold {status_color}"),
-            kv("Port", port),
-            kv("Deps", deps),
-        ]
-
-        # Render all available command modes as syntax-highlighted blocks.
+        # Command rows.
         if isinstance(svc.cmd, dict):
             for mode, cmd in svc.cmd.items():
-                lines.append(Text())
                 label = "Command" if mode == "default" else f"Command ({mode})"
-                lines.append(Text(label, style="bold"))
-                lines.append(
-                    Syntax(cmd, "bash", theme="monokai", background_color="default")
-                )
+                self._add_command_block(table, label, cmd)
         else:
-            lines.append(Text())
-            lines.append(Text("Command", style="bold"))
-            lines.append(
-                Syntax(svc.cmd, "bash", theme="monokai", background_color="default")
-            )
+            self._add_command_block(table, "Command", svc.cmd)
 
-        content.update(VStack(lines))
+    def _add_command_block(self, table: DataTable, label: str, cmd: str) -> None:
+        """Add a command block (spacer + label + syntax) to the table."""
+        table.add_row("", "")
+        table.add_row(Text(label, style="bold"), "")
+        table.add_row(
+            "",
+            Syntax(cmd, "bash", theme="monokai", background_color="default"),
+        )
 
     def _update_buttons(self, svc: Optional[Service]) -> None:
         """Enable/disable action buttons based on service state.

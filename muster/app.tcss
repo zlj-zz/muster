@@ -1,28 +1,89 @@
 /* ================================================================
-   muster TCSS — Warm orange accent with round corners
+   muster TCSS — Activity Bar Layout (Atom One Dark + Vibrant Orange)
    ================================================================ */
 
 Screen {
-    background: #0a0a0e;
+    background: #282c34;
+    layout: vertical;
+    overflow-y: hidden;
+    overflow-x: hidden;
+}
+
+#main {
+    layout: vertical;
+    height: 1fr;
+    min-height: 0;
+    overflow: hidden;
 }
 
 #body {
-    height: 100%;
-    padding: 1 2;
+    layout: horizontal;
+    height: 1fr;
+    min-height: 0;
+    overflow: hidden;
 }
 
-/* service tree */
+/* ========== Content Switchers ========== */
+ContentSwitcher {
+    width: 100%;
+    height: 1fr;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ========== Left Panel ========== */
+#left-content {
+    width: 38;
+    height: 1fr;
+    min-height: 0;
+    border-right: solid #3e4451;
+}
+
+#left-svc, #left-env, #left-yaml {
+    width: 100%;
+    height: 1fr;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#left-svc {
+    layout: vertical;
+}
+
+/* ========== Right Panel ========== */
+#right-content {
+    width: 1fr;
+    height: 1fr;
+}
+
+#right-svc, #right-env, #right-yaml {
+    width: 100%;
+    height: 1fr;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* svc tab: detail + log split */
+#right-svc {
+    layout: vertical;
+}
+
+#right-svc DetailPanel {
+    height: 38%;
+    border-bottom: solid #3e4451;
+}
+
+#right-svc LogPanel {
+    height: 1fr;
+}
+
+/* ========== Service Tree ========== */
 #service-tree {
-    width: 28%;
-    height: 100%;
-    border: round #7c3a1a;
-    background: #0a0a0e;
-    padding: 1 1;
-    margin: 0 1 0 0;
-}
-
-#service-tree:focus {
-    border: round #f97316;
+    width: 100%;
+    height: 1fr;
+    border: none;
+    background: transparent;
+    padding: 0 1;
 }
 
 Tree {
@@ -31,8 +92,9 @@ Tree {
 }
 
 Tree > .tree--cursor {
-    background: #2d1a0f;
+    background: #3e4451;
     text-style: bold;
+    color: auto;
 }
 
 Tree > .tree--highlight {
@@ -40,88 +102,112 @@ Tree > .tree--highlight {
 }
 
 .tree--guides {
-    color: #2a2a35;
+    color: #2c313c;
 }
 
-#right-panel {
-    width: 72%;
-    height: 100%;
-}
-
-/* status bar */
-#status-bar {
+/* ========== Env Indicator ========== */
+#env-indicator {
+    width: 100%;
     height: 1;
-    background: #0a0a0e;
-    color: #6e7681;
+    background: #2c313c;
+    color: #858585;
     padding: 0 1;
-    border: none;
+    content-align: left middle;
+    border-top: solid #3e4451;
 }
 
-/* detail */
+/* ========== Detail Panel ========== */
 #detail {
-    height: 35%;
-    border: round #7c3a1a;
-    background: #0a0a0e;
-    padding: 1;
-    margin: 0 0 1 0;
+    height: 1fr;
+    border: none;
+    background: #2c313c;
+    padding: 0;
+    overflow: hidden;
 }
 
 #detail-container {
-    height: 100%;
+    height: 1fr;
+    min-height: 0;
+    layout: vertical;
+    overflow: hidden;
 }
 
 #detail-content {
     height: 1fr;
+    border: none;
+    background: transparent;
 }
 
-/* buttons */
-#action-buttons {
+#detail-content .datatable--header {
     display: none;
+}
+
+#detail-content .datatable--cursor {
+    background: transparent;
+}
+
+#detail-content .datatable--hover {
+    background: transparent;
+}
+
+/* action buttons */
+#action-buttons {
     height: auto;
-    padding: 0;
+    padding: 0 1;
+    border-top: solid #3e4451;
+    background: #2c313c;
 }
 
 #action-buttons Button {
     width: auto;
-    height: 3;
-    padding: 0 2;
-    margin: 0 1;
-    border: round #7c3a1a;
-    background: #0a0a0e;
-    color: #858585;
+    margin: 0 1 0 0;
+    padding: 0;
     content-align: center middle;
 }
 
-#action-buttons Button:hover {
-    background: #111118;
-    border: round #f97316;
+#action-buttons Button.-style-flat.-success {
+    background: #4caf50;
+    border: block #4caf50;
+    color: #ffffff;
+}
+#action-buttons Button.-style-flat.-success:hover {
+    background: #66bb6a;
+    border: block #66bb6a;
 }
 
-#action-buttons Button#btn-start {
-    color: #4ec9b0;
+#action-buttons Button.-style-flat.-error {
+    background: #f44336;
+    border: block #f44336;
+    color: #ffffff;
+}
+#action-buttons Button.-style-flat.-error:hover {
+    background: #ef5350;
+    border: block #ef5350;
 }
 
-#action-buttons Button#btn-stop {
-    color: #f44747;
+#action-buttons Button.-style-flat.-warning {
+    background: #ff9800;
+    border: block #ff9800;
+    color: #ffffff;
 }
-
-#action-buttons Button#btn-restart {
-    color: #dcdcaa;
+#action-buttons Button.-style-flat.-warning:hover {
+    background: #ffa726;
+    border: block #ffa726;
 }
 
 #action-buttons Button:disabled {
-    color: #33333a;
-    background: #0a0a0e;
-    border: round #2d2d3a;
+    background: #252830;
+    border: block #252830;
+    color: #5c6370;
+    text-opacity: 1.0;
 }
 
-/* log */
+/* ========== Log Panel ========== */
 #log {
     height: 1fr;
-    border: round #7c3a1a;
-    background: #0a0a0e;
+    border: none;
+    background: #323842;
     padding: 1;
-    margin: 1 0 0 0;
 }
 
 TextArea {
@@ -133,22 +219,64 @@ TextArea:focus {
     border: none;
 }
 
-/* footer */
-Footer {
-    background: #0a0a0e;
-    color: #52525b;
+/* ========== Env Detail Panel ========== */
+#env-detail {
+    height: 1fr;
     border: none;
+    background: #2c313c;
+    padding: 1 2;
+    overflow: hidden;
 }
 
-Footer > .footer--highlight {
-    background: #1f1f25;
-    color: #f97316;
+#env-detail-content {
+    height: 1fr;
+    overflow-y: auto;
 }
 
-Footer > .footer--highlight-key {
-    color: #fdba74;
+/* ========== YAML Preview ========== */
+#yaml-preview {
+    height: 1fr;
+    border: none;
+    background: #323842;
+    padding: 0;
+    overflow: hidden;
 }
 
-Footer > .footer--key {
-    color: #6e7681;
+#yaml-title {
+    height: 1;
+    padding: 0 1;
+    background: #282c34;
+    color: #abb2bf;
+    content-align: left middle;
+    border-bottom: solid #3e4451;
+}
+
+#yaml-text {
+    height: 1fr;
+    border: none;
+    background: transparent;
+    padding: 1;
+}
+
+/* footer bar */
+#footer-bar {
+    height: 3;
+    background: #282c34;
+    border-top: solid #3e4451;
+    padding: 0 1;
+}
+
+#footer-keys {
+    width: 1fr;
+    content-align: left middle;
+    color: #5c6370;
+}
+
+#footer-mode {
+    width: auto;
+    background: #3e4451;
+    color: #abb2bf;
+    padding: 0 2;
+    border-left: thick #e5a23e;
+    content-align: center middle;
 }

@@ -20,9 +20,9 @@ DEFAULT_STATUS_COLORS = {
 }
 
 DEFAULT_GROUPS = [
-    Group(id="domain", label="DOMAIN", color="#569cd6", order=0),
-    Group(id="aggregation", label="AGGREGATION", color="#c586c0", order=1),
-    Group(id="api", label="API", color="#ce9178", order=2),
+    Group(id="domain", label="DOMAIN", color="#61afef", order=0),
+    Group(id="aggregation", label="AGGREGATION", color="#c678dd", order=1),
+    Group(id="api", label="API", color="#d19a66", order=2),
 ]
 
 DEFAULT_ENV_CHECKS = [

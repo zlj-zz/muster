@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "muster"
-version = "0.1.0"
+version = "0.2.0"
 description = "A TUI-based service orchestrator for local development"
 readme = "README.md"
 license = { text = "MIT" }
@@ -13,6 +13,7 @@ dependencies = [
     "textual>=0.50.0",
     "pyyaml>=6.0",
     "rich>=13.0.0",
+    "tree-sitter-yaml>=0.7.0",
 ]
 
 [project.optional-dependencies]

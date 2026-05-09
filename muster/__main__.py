@@ -47,6 +47,7 @@ def main() -> None:
         config=config,
         services=services,
         registry=registry,
+        config_path=yaml_path,
         cmd_mode=args.mode,
     )
     app.run()

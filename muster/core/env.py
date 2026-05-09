@@ -43,11 +43,7 @@ def check_env(env_checks: List[EnvCheck]) -> List[Tuple[str, bool]]:
     results: List[Tuple[str, bool]] = []
     for ec in env_checks:
         if ec.type == "tcp":
-            ok = (
-                check_tcp(ec.host or "127.0.0.1", ec.port or 0)
-                if ec.port
-                else False
-            )
+            ok = check_tcp(ec.host or "127.0.0.1", ec.port or 0) if ec.port else False
         elif ec.type == "http":
             # TODO: implement HTTP health check (requests / urllib)
             ok = False
