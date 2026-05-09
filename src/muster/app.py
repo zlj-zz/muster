@@ -21,6 +21,7 @@ from .core.orchestrator import ServiceOrchestrator
 from .models import Group, MusterConfig, Service, Status
 from .widgets import (
     ActivityBar,
+    ActivityTab,
     DetailPanel,
     EnvDetailPanel,
     EnvIndicator,
@@ -88,6 +89,7 @@ class MusterApp(App):
             on_notify=lambda msg, sev: self.notify(msg, severity=sev),
         )
         self._yaml_files = self._scan_yaml_files()
+        self._stop_pending = False
 
     def _scan_yaml_files(self) -> list[str]:
         """Scan for YAML files in the config directory."""
@@ -375,11 +377,30 @@ class MusterApp(App):
             asyncio.create_task(self._orchestrator.start_with_deps(svc, self.cmd_mode))
 
     def action_stop_all(self) -> None:
-        """Stop every service across all groups."""
-        for svc in self.all_services:
-            if svc.status != Status.STOPPED:
+        """Stop every service across all groups (double-tap confirmation).
+
+        First press shows a warning toast; press again within 5 seconds
+        to confirm and stop all running services.
+        """
+        running = [s for s in self.all_services if s.status != Status.STOPPED]
+        if not running:
+            self.notify("No services are running", severity="information")
+            return
+
+        if self._stop_pending:
+            self._stop_pending = False
+            for svc in running:
                 asyncio.create_task(self._orchestrator.stop(svc))
-        self.notify("Stopping all services...", severity="information")
+            self.notify("Stopping all services...", severity="information")
+            return
+
+        self._stop_pending = True
+        self.notify(
+            f"Press [b]^s[/b] again to stop {len(running)} service(s)",
+            severity="warning",
+            timeout=5,
+        )
+        self.set_timer(5, self._reset_stop_pending)
 
     def action_restart_service(self) -> None:
         """Restart the currently selected service."""
@@ -409,6 +430,10 @@ class MusterApp(App):
         label = self._group_filter.upper() if self._group_filter else "ALL"
         self.notify(f"Group filter: {label}", severity="information")
         self._refresh_tree()
+
+    def _reset_stop_pending(self) -> None:
+        """Cancel the pending stop-all confirmation after timeout."""
+        self._stop_pending = False
 
     def action_refresh_env(self) -> None:
         """Manually trigger an environment status refresh."""
