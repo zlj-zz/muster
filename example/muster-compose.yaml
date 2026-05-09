@@ -1,0 +1,116 @@
+# ==========================================
+# muster example configuration (demo)
+# ==========================================
+# This is a self-contained demo configuration.  It uses fictional services
+# and simple shell commands so that `muster -f example/muster.yaml` can be
+# run immediately without any external project dependencies.
+#
+# Each "service" here is just a small Python one-liner that binds to a port
+# and prints a heartbeat line every second.  This is enough to exercise the
+# full muster feature set: dependency resolution, health checks, log streaming,
+# and status transitions.
+
+config:
+  # ------------------------------------------------------------------
+  # environment dependency checks
+  # ------------------------------------------------------------------
+  # These are checked every 5 s and shown as coloured dots in the status bar.
+  # For this demo they target common local-dev ports; adjust to match your
+  # actual infrastructure.
+  env_checks:
+    - name: etcd
+      type: tcp
+      host: 127.0.0.1
+      port: 2379
+    - name: mysql
+      type: tcp
+      host: 127.0.0.1
+      port: 3306
+    - name: redis
+      type: tcp
+      host: 127.0.0.1
+      port: 6379
+
+  # ------------------------------------------------------------------
+  # service groups
+  # ------------------------------------------------------------------
+  # Services are grouped in the left-hand tree.  Lower `order` appears first.
+  groups:
+    - id: infra
+      label: INFRA
+      color: "#569cd6"
+      order: 0
+    - id: backend
+      label: BACKEND
+      color: "#c586c0"
+      order: 1
+    - id: frontend
+      label: FRONTEND
+      color: "#ce9178"
+      order: 2
+
+  # ------------------------------------------------------------------
+  # port auto-discovery from config files
+  # ------------------------------------------------------------------
+  # When enabled, muster scans `<svc-name>/<config_dir>/*.yaml` and applies
+  # the regex rules below to extract the listening port automatically.
+  # Set `enabled: false` if you prefer to declare ports explicitly.
+  port_discovery:
+    enabled: false
+    config_dir: "etc"
+    config_pattern: "*.yaml"
+    exclude_pattern: "_(test|prod|pre)\\.yaml$"
+    rules:
+      - regex: '^\s*ListenOn:\s*.*:(\d+)\s*$'
+      - regex: '^\s*Port:\s*(\d+)\s*$'
+
+# ==========================================
+# services
+# ==========================================
+# Each entry becomes a row in the service tree.  `cmd` can be:
+#   * a plain string → shorthand for {"default": "..."}
+#   * a dict → multiple modes that can be cycled with the "t" key
+#
+# The commands below use a tiny Python HTTP server so the demo works out of
+# the box on any machine with Python 3 installed.
+
+services:
+  - name: auth-service
+    cmd:
+      default: "python3 -c \"import http.server, socketserver; h=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:s.send_response(200)or s.end_headers()}); socketserver.TCPServer(('127.0.0.1', 9101), h).serve_forever()\""
+      test: "python3 -c \"import http.server, socketserver; h=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:s.send_response(200)or s.end_headers()}); socketserver.TCPServer(('127.0.0.1', 9101), h).serve_forever()\""
+    group: infra
+    port: 9101
+    depends_on: []
+
+  - name: cache-service
+    cmd: "python3 -c \"import http.server, socketserver; h=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:s.send_response(200)or s.end_headers()}); socketserver.TCPServer(('127.0.0.1', 9102), h).serve_forever()\""
+    group: infra
+    port: 9102
+    depends_on: []
+
+  - name: user-service
+    cmd:
+      default: "python3 -c \"import http.server, socketserver; h=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:s.send_response(200)or s.end_headers()}); socketserver.TCPServer(('127.0.0.1', 9201), h).serve_forever()\""
+      dev: "python3 -c \"import http.server, socketserver; h=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:s.send_response(200)or s.end_headers()}); socketserver.TCPServer(('127.0.0.1', 9201), h).serve_forever()\""
+    group: backend
+    port: 9201
+    depends_on: [auth-service, cache-service]
+
+  - name: order-service
+    cmd: "python3 -c \"import http.server, socketserver; h=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:s.send_response(200)or s.end_headers()}); socketserver.TCPServer(('127.0.0.1', 9202), h).serve_forever()\""
+    group: backend
+    port: 9202
+    depends_on: [auth-service, user-service]
+
+  - name: payment-service
+    cmd: "python3 -c \"import http.server, socketserver; h=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:s.send_response(200)or s.end_headers()}); socketserver.TCPServer(('127.0.0.1', 9203), h).serve_forever()\""
+    group: backend
+    port: 9203
+    depends_on: [cache-service]
+
+  - name: dashboard
+    cmd: "python3 -c \"import http.server, socketserver; h=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:s.send_response(200)or s.end_headers()}); socketserver.TCPServer(('127.0.0.1', 9301), h).serve_forever()\""
+    group: frontend
+    port: 9301
+    depends_on: [user-service, order-service]

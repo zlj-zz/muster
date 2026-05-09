@@ -1,0 +1,135 @@
+Screen {
+    background: #0a0a0c;
+    align: center middle;
+}
+
+#body {
+    height: 100%;
+}
+
+#service-tree {
+    width: 28%;
+    height: 100%;
+    border: solid #0c0c0e;
+    background: #0c0c0e;
+    padding: 0 0;
+}
+
+#service-tree:focus {
+    border: solid #1a1a1e;
+}
+
+Tree {
+    background: transparent;
+    padding: 0 1;
+}
+
+Tree > .tree--cursor {
+    background: #264f78;
+}
+
+Tree > .tree--highlight {
+    text-style: none;
+}
+
+.tree--guides {
+    color: #1e1e22;
+}
+
+#right-panel {
+    width: 72%;
+    height: 100%;
+}
+
+#status-bar {
+    height: 1;
+    background: #0a0a0c;
+    color: #52525b;
+    padding: 0 1;
+}
+
+#detail {
+    height: 35%;
+    background: #0c0c0e;
+    border: none;
+    padding: 1;
+}
+
+#detail-container {
+    height: 100%;
+}
+
+#detail-content {
+    height: 1fr;
+}
+
+#action-buttons {
+    display: none;
+    height: auto;
+    padding: 0;
+}
+
+#action-buttons Button {
+    width: auto;
+    height: 3;
+    padding: 0 2;
+    margin: 0 1;
+    border: none;
+    background: transparent;
+    color: #858585;
+    content-align: center middle;
+}
+
+#action-buttons Button:hover {
+    background: #161618;
+}
+
+#action-buttons Button#btn-start {
+    color: #4ec9b0;
+}
+
+#action-buttons Button#btn-stop {
+    color: #f44747;
+}
+
+#action-buttons Button#btn-restart {
+    color: #dcdcaa;
+}
+
+#action-buttons Button:disabled {
+    color: #333333;
+    background: transparent;
+}
+
+#log {
+    height: 1fr;
+    background: #0e0e10;
+    border: none;
+}
+
+TextArea {
+    background: transparent;
+    border: none;
+}
+
+TextArea:focus {
+    border: none;
+}
+
+Footer {
+    background: #0a0a0c;
+    color: #52525b;
+}
+
+Footer > .footer--highlight {
+    background: #1a1a1e;
+}
+
+Footer > .footer--highlight-key {
+    color: #858585;
+}
+
+Footer > .footer--key {
+    color: #6e7681;
+}
+

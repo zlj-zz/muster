@@ -1,0 +1,431 @@
+"""Service orchestration: lifecycle, health checks, log streaming.
+
+``ServiceOrchestrator`` manages subprocess creation, monitoring, and teardown
+independently of the TUI.  It communicates state changes back to the UI via
+callback injection so that the module remains reusable in headless contexts.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+import signal
+from pathlib import Path
+from typing import Callable, Dict, List, Optional
+
+from ..models import MusterConfig, Service, Status
+from .process import kill_port_owner
+from .resolver import resolve_dependencies, resolve_port
+
+
+class ServiceOrchestrator:
+    """Manages service process lifecycle independently of the UI.
+
+    Args:
+        config: Parsed ``MusterConfig`` (used for port-discovery rules and
+            group ordering).
+        registry: Mapping from service name to ``Service`` instance.
+        on_log: Callback ``(svc_name, line)`` fired for every log line.
+        on_status: Callback ``(service)`` fired whenever a service's
+            ``status`` field changes.
+        on_notify: Callback ``(message, severity)`` fired for user-facing
+            toast notifications.
+    """
+
+    def __init__(
+        self,
+        config: MusterConfig,
+        registry: Dict[str, Service],
+        *,
+        on_log: Callable[[str, str], None] = lambda _s, _l: None,
+        on_status: Callable[[Service], None] = lambda _s: None,
+        on_notify: Callable[[str, str], None] = lambda _m, _s: None,
+    ) -> None:
+        self.config = config
+        self.registry = registry
+        self._on_log = on_log
+        self._on_status = on_status
+        self._on_notify = on_notify
+        self._reader_tasks: Dict[str, asyncio.Task] = {}
+        self._health_tasks: Dict[str, asyncio.Task] = {}
+
+    # ---------- internal helpers ----------
+
+    def _log(self, svc_name: str, line: str) -> None:
+        """Forward a log line to the UI callback."""
+        self._on_log(svc_name, line)
+
+    def _set_status(self, svc: Service, status: Status) -> None:
+        """Update a service's status and notify the UI."""
+        svc.status = status
+        self._on_status(svc)
+
+    def _notify(self, msg: str, severity: str = "information") -> None:
+        """Forward a notification to the UI callback."""
+        self._on_notify(msg, severity)
+
+    def _abort_start(
+        self, target: Service, dep: Service, is_target: bool, reason: str
+    ) -> None:
+        """Log and notify that a service (or its dependency) failed to start.
+
+        Args:
+            target: The service the user originally requested to start.
+            dep: The specific service that caused the abort.
+            is_target: ``True`` if ``dep`` is the same as ``target``.
+            reason: Human-readable failure reason (e.g. "start failed").
+        """
+        label = "" if is_target else f"Dep {dep.name} "
+        msg = f"{label}{reason}, aborting {target.name} start"
+        self._log(target.name, f">>> {msg}")
+        self._notify(msg, "error")
+
+    # ---------- public API ----------
+
+    async def start_with_deps(self, svc: Service, mode: str = "default") -> None:
+        """Start a service after resolving and starting all dependencies.
+
+        Dependencies are launched layer-by-layer (group order).  Within each
+        layer, services are started in parallel; the caller then waits for the
+        entire layer to become ``RUNNING`` before proceeding to the next layer.
+
+        If any dependency fails or times out, the start sequence is aborted.
+
+        Args:
+            svc: The target service to start.
+            mode: Command mode key (e.g. ``"default"``, ``"test"``).
+        """
+        try:
+            deps = resolve_dependencies([svc.name], self.registry)
+        except ValueError as e:
+            self._notify(f"Dependency resolution failed: {e}", "error")
+            return
+
+        dep_names = [d.name for d in deps]
+        self._log(svc.name, f">>> Dependencies: {dep_names}")
+
+        # Pre-emptively kill any process already bound to the target port so
+        # that the new instance can bind cleanly.
+        port = svc.port or resolve_port(svc.name, self.config.port_discovery)
+        if port:
+            try:
+                import socket
+
+                with socket.create_connection(("127.0.0.1", port), timeout=1.0):
+                    self._log(svc.name, f">>> Port {port} in use, cleaning up...")
+                    await kill_port_owner(port)
+            except OSError:
+                pass
+
+        # Build launch plan: one layer per group, ordered by group.order.
+        order_map = {g.id: g.order for g in self.config.groups}
+        layers = sorted(
+            set(d.group for d in deps), key=lambda g: order_map.get(g, 999)
+        )
+        self._log(svc.name, f">>> Groups: {layers}")
+
+        for layer in layers:
+            layer_svcs = [d for d in deps if d.group == layer]
+            layer_names = [s.name for s in layer_svcs]
+            self._log(svc.name, f">>> Starting [{layer}] group: {layer_names}")
+
+            # Kick off every service in this layer that is not already running.
+            for s in layer_svcs:
+                if s.status not in (Status.STARTING, Status.RUNNING):
+                    p = s.port or resolve_port(s.name, self.config.port_discovery)
+                    if p:
+                        try:
+                            import socket
+
+                            with socket.create_connection(
+                                ("127.0.0.1", p), timeout=1.0
+                            ):
+                                self._log(
+                                    svc.name,
+                                    f">>> Dep {s.name} port {p} in use, cleaning up...",
+                                )
+                                await kill_port_owner(p)
+                        except OSError:
+                            pass
+                    self._log(
+                        svc.name, f">>> Scheduling start: {s.name} (status: {s.status.value})"
+                    )
+                    asyncio.create_task(self.start(s, mode))
+                else:
+                    self._log(
+                        svc.name, f">>> Skipping start: {s.name} (status: {s.status.value})"
+                    )
+
+            # Wait for the whole layer to reach a terminal state.
+            for s in layer_svcs:
+                is_target = s.name == svc.name
+                if s.status in (Status.RUNNING, Status.FAILED):
+                    if s.status == Status.FAILED:
+                        self._abort_start(svc, s, is_target, "start failed")
+                        return
+                    self._log(svc.name, f">>> {s.name} already running, skip wait")
+                    continue
+                self._log(
+                    svc.name, f">>> Waiting for {s.name} ready (current: {s.status.value})..."
+                )
+                for _ in range(180):
+                    if s.status == Status.RUNNING:
+                        self._log(svc.name, f">>> {s.name} ready")
+                        break
+                    if s.status == Status.FAILED:
+                        self._abort_start(svc, s, is_target, "start failed")
+                        return
+                    await asyncio.sleep(0.5)
+                if s.status != Status.RUNNING:
+                    self._abort_start(svc, s, is_target, "start timeout (90s)")
+                    return
+
+    async def start(self, svc: Service, mode: str = "default") -> None:
+        """Start a single service process.
+
+        Creates a subprocess shell, wires up log readers and health checks,
+        and transitions the service through ``STARTING`` → ``RUNNING`` or
+        ``FAILED``.
+
+        Args:
+            svc: Service to start.
+            mode: Command mode key passed to ``svc.cmd_for()``.
+        """
+        if svc.status in (Status.STARTING, Status.RUNNING):
+            return
+
+        try:
+            self._set_status(svc, Status.STARTING)
+            self._notify(f"Starting {svc.name}...", "information")
+
+            cmd = svc.cmd_for(mode)
+            if not cmd:
+                raise RuntimeError("no command available for mode")
+            # Unset GOROOT to avoid conflicts with local Go toolchains.
+            cmd = f"unset GOROOT && {cmd}"
+
+            logfile = Path("logs") / f"{svc.name}.log"
+            logfile.parent.mkdir(exist_ok=True)
+
+            svc.log_lines = [
+                f">>> Command: {cmd}",
+                ">>> Compiling (first start may take a few seconds)...",
+            ]
+            for line in svc.log_lines:
+                self._log(svc.name, line)
+
+            shell = os.environ.get("SHELL", "/bin/sh")
+            proc = await asyncio.create_subprocess_shell(
+                cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                start_new_session=True,
+                executable=shell,
+            )
+            svc.proc = proc
+            pid_msg = f">>> Process PID: {proc.pid}"
+            svc.log_lines.append(pid_msg)
+            self._log(svc.name, pid_msg)
+
+            self._reader_tasks[svc.name] = asyncio.create_task(
+                self._read_output(svc, proc, logfile)
+            )
+            self._health_tasks[svc.name] = asyncio.create_task(
+                self._wait_process(svc)
+            )
+            asyncio.create_task(self._health_check(svc))
+        except Exception as e:
+            err_msg = f"!!! Start error: {e}"
+            svc.log_lines.append(err_msg)
+            self._log(svc.name, err_msg)
+            self._set_status(svc, Status.FAILED)
+            self._notify(f"Start {svc.name} failed: {e}", "error")
+
+    async def stop(self, svc: Service) -> None:
+        """Stop a service process gracefully.
+
+        Sends ``SIGTERM`` to the process group, waits up to 8 seconds, then
+        escalates to ``SIGKILL`` if necessary.
+
+        Args:
+            svc: Service to stop.
+        """
+        if svc.status == Status.STOPPED:
+            return
+
+        stop_msg = ">>> Stopping service..."
+        svc.log_lines.append(stop_msg)
+        self._log(svc.name, stop_msg)
+
+        for task_dict in (self._reader_tasks, self._health_tasks):
+            task = task_dict.pop(svc.name, None)
+            if task:
+                task.cancel()
+
+        if svc.proc and svc.proc.returncode is None:
+            try:
+                os.killpg(os.getpgid(svc.proc.pid), signal.SIGTERM)
+                await asyncio.wait_for(svc.proc.wait(), timeout=8.0)
+            except asyncio.TimeoutError:
+                try:
+                    os.killpg(os.getpgid(svc.proc.pid), signal.SIGKILL)
+                    await asyncio.wait_for(svc.proc.wait(), timeout=2.0)
+                except Exception as e:
+                    # Log to stderr since the logger may already be torn down.
+                    import sys
+
+                    print(f"SIGKILL failed for {svc.name}: {e}", file=sys.stderr)
+            except Exception as e:
+                import sys
+
+                print(f"stop_service failed for {svc.name}: {e}", file=sys.stderr)
+
+        svc.proc = None
+        self._set_status(svc, Status.STOPPED)
+        stopped_msg = ">>> Service stopped"
+        svc.log_lines.append(stopped_msg)
+        self._log(svc.name, stopped_msg)
+        self._notify(f"{svc.name} stopped", "information")
+
+    async def restart(self, svc: Service, mode: str = "default") -> None:
+        """Restart a service.
+
+        Args:
+            svc: Service to restart.
+            mode: Command mode key.
+        """
+        await self.stop(svc)
+        await asyncio.sleep(0.5)
+        await self.start_with_deps(svc, mode)
+
+    async def stop_all(self, services: List[Service]) -> None:
+        """Stop all given services.
+
+        Args:
+            services: Iterable of services to stop.
+        """
+        for svc in services:
+            if svc.status != Status.STOPPED:
+                await self.stop(svc)
+
+    async def cleanup(self) -> None:
+        """Cancel all background tasks (log readers, health checks, etc.)."""
+        for task in list(self._reader_tasks.values()) + list(
+            self._health_tasks.values()
+        ):
+            task.cancel()
+
+    # ---------- background tasks ----------
+
+    async def _read_output(
+        self, svc: Service, proc: asyncio.subprocess.Process, logfile: Path
+    ) -> None:
+        """Stream subprocess stdout to the in-memory ring buffer and disk log.
+
+        Maintains a rolling window of the last 2000 lines in ``svc.log_lines``
+        to prevent unbounded memory growth for long-running services.
+
+        Args:
+            svc: Service owning the process.
+            proc: Running subprocess.
+            logfile: Path to the on-disk log file.
+        """
+        try:
+            with open(logfile, "w", encoding="utf-8") as f:
+                while True:
+                    line = await proc.stdout.readline()
+                    if not line:
+                        break
+                    text = line.decode("utf-8", errors="replace").rstrip()
+                    if text:
+                        f.write(text + "\n")
+                        f.flush()
+                        if len(svc.log_lines) >= 2000:
+                            svc.log_lines = svc.log_lines[-1999:]
+                        svc.log_lines.append(text)
+                        self._log(svc.name, text)
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            err = f"!!! Log read error: {exc}"
+            svc.log_lines.append(err)
+            self._log(svc.name, err)
+
+    async def _wait_process(self, svc: Service) -> None:
+        """Wait for the subprocess to exit and update status if it failed.
+
+        Args:
+            svc: Service whose process is being monitored.
+        """
+        if svc.proc is None:
+            return
+        try:
+            returncode = await svc.proc.wait()
+            exit_msg = f">>> Process exit code: {returncode}"
+            svc.log_lines.append(exit_msg)
+            self._log(svc.name, exit_msg)
+
+            if returncode != 0 and svc.status != Status.STOPPED:
+                self._set_status(svc, Status.FAILED)
+                self._notify(
+                    f"{svc.name} process exited abnormally (code={returncode})", "error"
+                )
+        except asyncio.CancelledError:
+            pass
+
+    async def _health_check(self, svc: Service) -> None:
+        """Poll the service's TCP port until it accepts connections.
+
+        If the service has no discoverable port, falls back to a 3-second
+        heuristic: if the process is still alive, mark it ``RUNNING``.
+
+        Times out after 60 seconds and marks the service ``FAILED``.
+
+        Args:
+            svc: Service to health-check.
+        """
+        import socket
+
+        try:
+            port = svc.port or resolve_port(svc.name, self.config.port_discovery)
+            if port is None:
+                await asyncio.sleep(3)
+                if svc.proc and svc.proc.returncode is None:
+                    self._set_status(svc, Status.RUNNING)
+                else:
+                    self._set_status(svc, Status.FAILED)
+                return
+
+            for i in range(60):
+                if svc.proc is None or svc.proc.returncode is not None:
+                    self._set_status(svc, Status.FAILED)
+                    self._log(svc.name, ">>> Process exited, health check failed")
+                    return
+                try:
+                    with socket.create_connection(
+                        ("127.0.0.1", port), timeout=1.0
+                    ):
+                        self._set_status(svc, Status.RUNNING)
+                        svc.port = port
+                        self._log(svc.name, f">>> Service ready (port {port})")
+                        self._notify(
+                            f"{svc.name} ready (:{port})", "success"
+                        )
+                        return
+                except OSError:
+                    pass
+                if i % 5 == 0:
+                    self._log(
+                        svc.name, f">>> Waiting for port {port} ready... ({i}s)"
+                    )
+                await asyncio.sleep(1)
+
+            self._set_status(svc, Status.FAILED)
+            self._log(svc.name, f">>> Port {port} not ready, health check timeout")
+            self._notify(f"{svc.name} port {port} not ready", "error")
+        except Exception as e:
+            err = f"!!! Health check error: {e}"
+            svc.log_lines.append(err)
+            self._log(svc.name, err)
+            self._set_status(svc, Status.FAILED)
+            self._notify(f"{svc.name} health check error: {e}", "error")
