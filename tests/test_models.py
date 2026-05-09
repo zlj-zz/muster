@@ -11,11 +11,19 @@ class TestServiceCmdFor:
     """Service.cmd_for() behaviour."""
 
     def test_dict_returns_correct_mode(self):
-        svc = Service(name="api", cmd={"default": "go run main.go", "test": "go test"}, group="backend")
+        svc = Service(
+            name="api",
+            cmd={"default": "go run main.go", "test": "go test"},
+            group="backend",
+        )
         assert svc.cmd_for("test") == "go test"
 
     def test_dict_falls_back_to_default(self):
-        svc = Service(name="api", cmd={"default": "go run main.go", "test": "go test"}, group="backend")
+        svc = Service(
+            name="api",
+            cmd={"default": "go run main.go", "test": "go test"},
+            group="backend",
+        )
         assert svc.cmd_for("prod") == "go run main.go"
 
     def test_dict_returns_empty_when_nothing_found(self):
@@ -32,7 +40,11 @@ class TestServiceCmdModes:
     """Service.cmd_modes property."""
 
     def test_dict_returns_keys(self):
-        svc = Service(name="api", cmd={"default": "go run main.go", "test": "go test"}, group="backend")
+        svc = Service(
+            name="api",
+            cmd={"default": "go run main.go", "test": "go test"},
+            group="backend",
+        )
         assert set(svc.cmd_modes) == {"default", "test"}
 
     def test_str_returns_default_only(self):

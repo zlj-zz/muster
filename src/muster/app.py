@@ -253,29 +253,44 @@ class MusterApp(App):
 
     def _update_detail(self) -> None:
         """Synchronise DetailPanel and LogPanel with the current tree selection."""
-        tree = self.query_one("#service-tree", ServiceTree)
-        svc = tree.current_service
-        self.query_one("#detail", DetailPanel).current_service = svc
+        from textual.css.query import NoMatches
+
         try:
-            self.query_one("#log", LogPanel).set_service(svc)
-        except Exception as e:
-            self.log.error(f"update_detail failed: {e}")
+            tree = self.query_one("#service-tree", ServiceTree)
+            svc = tree.current_service
+            self.query_one("#detail", DetailPanel).current_service = svc
+            try:
+                self.query_one("#log", LogPanel).set_service(svc)
+            except NoMatches:
+                pass
+        except NoMatches:
+            pass
 
     def _update_env_detail(self) -> None:
         """Synchronise EnvDetailPanel with the current env list selection."""
-        env_list = self.query_one("#env-list", EnvList)
-        env = env_list.current_env
-        self.query_one("#right-env", EnvDetailPanel).current_env = env
+        from textual.css.query import NoMatches
+
+        try:
+            env_list = self.query_one("#env-list", EnvList)
+            env = env_list.current_env
+            self.query_one("#right-env", EnvDetailPanel).current_env = env
+        except NoMatches:
+            pass
 
     def _update_yaml_preview(self) -> None:
         """Synchronise YamlPreview with the current file list selection."""
-        file_list = self.query_one("#file-list", FileList)
-        file_path = file_list.current_file
-        if file_path and self._config_path:
-            full_path = str(self._config_path.parent / file_path)
-            self.query_one("#right-yaml", YamlPreview).current_file = full_path
-        else:
-            self.query_one("#right-yaml", YamlPreview).current_file = None
+        from textual.css.query import NoMatches
+
+        try:
+            file_list = self.query_one("#file-list", FileList)
+            file_path = file_list.current_file
+            if file_path and self._config_path:
+                full_path = str(self._config_path.parent / file_path)
+                self.query_one("#right-yaml", YamlPreview).current_file = full_path
+            else:
+                self.query_one("#right-yaml", YamlPreview).current_file = None
+        except NoMatches:
+            pass
 
     def _refresh_env_status(self) -> None:
         """Poll environment checks and refresh all indicators."""

@@ -105,7 +105,10 @@ class TestOrchestratorRestart:
     """Restart increments counter."""
 
     @patch("muster.core.orchestrator.ServiceOrchestrator.stop", new_callable=AsyncMock)
-    @patch("muster.core.orchestrator.ServiceOrchestrator.start_with_deps", new_callable=AsyncMock)
+    @patch(
+        "muster.core.orchestrator.ServiceOrchestrator.start_with_deps",
+        new_callable=AsyncMock,
+    )
     async def test_increments_restart_count(self, mock_start, mock_stop):
         svc = Service(name="api", cmd="echo hello", group="backend")
         svc.status = Status.RUNNING
