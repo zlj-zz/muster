@@ -8,7 +8,7 @@ A TUI-based service orchestrator for local development. Think of it as a mini da
 
 ```bash
 pip install muster
-muster -f muster.yaml
+muster -f muster-compose.yaml
 ```
 
 ## Features
@@ -23,7 +23,7 @@ muster -f muster.yaml
 
 ## Quick Start
 
-Create a `muster.yaml` in your project root:
+Create a `muster-compose.yaml` in your project root:
 
 ```yaml
 config:
@@ -89,16 +89,16 @@ services:
 | `↑` / `↓` or `k` / `j` | Navigate services |
 | `Enter` | Start / stop selected service |
 | `R` | Restart selected service |
-| `a` | Start all services |
-| `s` | Stop all services |
+| `ctrl+s` | Stop all services |
 | `r` | Refresh environment status |
 | `t` | Cycle command mode |
 | `l` | Cycle group filter |
-| `q` | Quit |
+| `1` / `2` / `3` | Switch to Svc / Env / Yaml tab |
+| `ctrl+q` | Quit |
 
 ## Configuration Reference
 
-See [`example/muster.yaml`](example/muster.yaml) for a full-featured example.
+See [`example/muster-compose.yaml`](example/muster-compose.yaml) for a full-featured example.
 
 ### `config.groups`
 
@@ -177,6 +177,19 @@ cmd: "npm run dev"                       # string shorthand
 cmd:
   default: "npm run dev"                # explicit map
   test: "npm run test:watch"
+```
+
+## Development
+
+```bash
+# Install with dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest -q
+
+# Run tests with coverage
+pytest -q --cov=muster --cov-report=term
 ```
 
 ## License

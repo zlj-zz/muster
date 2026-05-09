@@ -76,3 +76,62 @@ python3 -m py_compile muster/**/*.py
 python3 -c "from muster.config import load_config; load_config('example/muster-compose.yaml')"
 python3 -m muster -f example/muster-compose.yaml
 ```
+
+### Test Structure
+
+Unit / integration tests live in `tests/`. TUI widget tests go in
+`tests/widgets/` and must use `WidgetTestApp` from `conftest.py`.
+
+### Coverage Target
+
+Minimum **80%** overall. Run locally before pushing:
+
+```bash
+pytest -q --cov=muster --cov-report=term
+```
+
+### Widget Testing
+
+Widgets do NOT have `.run_test()` — only `App` does. Wrap every widget in
+`WidgetTestApp` (defined in `tests/conftest.py`):
+
+```python
+async def test_widget_behavior(self):
+    widget = MyWidget()
+    app = WidgetTestApp(widget)
+    async with app.run_test() as pilot:
+        # query widget internals, press keys, etc.
+```
+
+To capture messages (e.g. `ServiceHighlighted`), use the `capture_messages`
+helper instead of `@app.on()` (Textual App has no `.on()` decorator):
+
+```python
+messages = capture_messages(tree, ServiceTree.ServiceHighlighted)
+tree.highlight_service("api")
+await pilot.pause()
+assert messages[0].service.name == "api"
+```
+
+### App Integration Testing
+
+Use the `minimal_app` fixture from `conftest.py`. It provides a `MusterApp`
+with a mocked `ServiceOrchestrator` (no real subprocesses):
+
+```python
+async def test_keyboard_action(self, minimal_app):
+    app = minimal_app
+    async with app.run_test() as pilot:
+        await pilot.press("l")
+        await pilot.pause()
+        assert app._group_filter == "backend"
+```
+
+### Adding Dev Dependencies
+
+Any new test dependency must be added to `[project.optional-dependencies] dev`
+in `pyproject.toml`. After editing, install locally:
+
+```bash
+pip install -e ".[dev]"
+```

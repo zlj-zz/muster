@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from muster.models import Status
 from muster.widgets.detail_panel import DetailPanel
 from muster.widgets.log_panel import LogPanel
 from muster.widgets.service_tree import ServiceTree
@@ -77,16 +78,60 @@ class TestAppServiceInteraction:
             assert messages[0].service.name == "api"
 
 
-class TestAppActions:
-    """Global keyboard actions."""
+class TestAppCursor:
+    """Cursor navigation."""
 
-    async def test_cycle_group_filter(self, minimal_app):
+    async def test_cursor_down_and_up(self, minimal_app):
         app = minimal_app
         async with app.run_test() as pilot:
-            assert app._group_filter is None
-            await pilot.press("l")
+            tree = app.query_one("#service-tree", ServiceTree)
+            tree.highlight_service("api")
             await pilot.pause()
-            assert app._group_filter == "backend"
+            initial = tree.cursor_node
+            app.action_cursor_down()
+            assert tree.cursor_node != initial
+            app.action_cursor_up()
+            assert tree.cursor_node == initial
+
+
+class TestAppToggleService:
+    """Enter key toggles start/stop."""
+
+    async def test_toggle_stopped_service_starts(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            tree = app.query_one("#service-tree", ServiceTree)
+            tree.highlight_service("api")
+            await pilot.pause()
+            app.action_toggle_service()
+            app._orchestrator.start_with_deps.assert_called_once()
+
+    async def test_toggle_running_service_stops(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            tree = app.query_one("#service-tree", ServiceTree)
+            tree.highlight_service("api")
+            await pilot.pause()
+            tree.current_service.status = Status.RUNNING
+            app.action_toggle_service()
+            app._orchestrator.stop.assert_called_once()
+
+
+class TestAppStopAll:
+    """Ctrl+s double-tap stop-all."""
+
+    async def test_stop_all_double_tap(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            # Set a service to RUNNING so stop_all has something to do
+            app.all_services[0].status = Status.RUNNING
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+            assert app._stop_pending is True
+            await pilot.press("ctrl+s")
+            await pilot.pause()
+            assert app._stop_pending is False
+            app._orchestrator.stop.assert_called()
 
     async def test_stop_all_no_running(self, minimal_app):
         app = minimal_app
@@ -94,5 +139,99 @@ class TestAppActions:
             # All services are STOPPED by default
             await pilot.press("ctrl+s")
             await pilot.pause()
-            # Should show a toast -- no orchestrator calls made
             assert app._stop_pending is False
+
+
+class TestAppRestart:
+    """R key restarts selected service."""
+
+    async def test_restart_service(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            tree = app.query_one("#service-tree", ServiceTree)
+            tree.highlight_service("api")
+            await pilot.pause()
+            await pilot.press("R")
+            await pilot.pause()
+            app._orchestrator.restart.assert_called_once()
+
+
+class TestAppCycleMode:
+    """t key cycles command mode."""
+
+    async def test_cycle_cmd_mode(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            initial = app.cmd_mode
+            await pilot.press("t")
+            await pilot.pause()
+            # Only one mode available (default), so mode stays the same
+            # but the action still runs
+            assert app.cmd_mode == initial
+
+
+class TestAppCycleGroup:
+    """l key cycles group filter."""
+
+    async def test_cycle_to_backend(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            assert app._group_filter is None
+            await pilot.press("l")
+            await pilot.pause()
+            assert app._group_filter == "backend"
+
+    async def test_cycle_to_frontend(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            await pilot.press("l")
+            await pilot.press("l")
+            await pilot.pause()
+            assert app._group_filter == "frontend"
+
+    async def test_cycle_back_to_all(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            await pilot.press("l")
+            await pilot.press("l")
+            await pilot.press("l")
+            await pilot.pause()
+            assert app._group_filter is None
+
+
+class TestAppRefreshEnv:
+    """r key refreshes environment status."""
+
+    async def test_refresh_env(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            await pilot.press("r")
+            await pilot.pause()
+            # Action runs without error; check env indicator exists
+            assert app.query_one("#env-indicator") is not None
+
+
+class TestAppMount:
+    """on_mount initialisation."""
+
+    async def test_on_mount_auto_selects_first_service(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            tree = app.query_one("#service-tree", ServiceTree)
+            assert tree.current_service is not None
+
+    async def test_footer_text(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            footer = app.query_one("#footer-keys")
+            text = footer.render()
+            assert "quit" in str(text)
+            assert "stop-all" in str(text)
+
+    async def test_mode_label(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            mode = app.query_one("#footer-mode")
+            text = mode.render()
+            assert "DEFAULT" in str(text)
+            assert "ALL" in str(text)
