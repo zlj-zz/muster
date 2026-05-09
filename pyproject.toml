@@ -31,3 +31,8 @@ path = "src/muster/__about__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/muster"]
 include = ["src/muster/*.tcss"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "auto"

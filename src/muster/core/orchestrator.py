@@ -238,6 +238,7 @@ class ServiceOrchestrator:
         except Exception as e:
             err_msg = f"!!! Start error: {e}"
             svc.log_lines.append(err_msg)
+            svc.last_error = str(e)
             self._log(svc.name, err_msg)
             self._set_status(svc, Status.FAILED)
             self._notify(f"Start {svc.name} failed: {e}", "error")
