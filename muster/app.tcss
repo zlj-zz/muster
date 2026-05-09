@@ -258,6 +258,18 @@ TextArea:focus {
     padding: 1;
 }
 
+/* ========== Scrollbar ========== */
+/* Textual uses `scrollbar-color` and `scrollbar-background` properties
+   on the PARENT container (Tree, TextArea, etc.), not on ScrollBar itself. */
+Tree, TextArea, VerticalScroll, DataTable {
+    scrollbar-color: #5c6370;
+    scrollbar-background: transparent;
+    scrollbar-color-hover: #7a8295;
+    scrollbar-background-hover: transparent;
+    scrollbar-color-active: #e5a23e;
+    scrollbar-background-active: transparent;
+}
+
 /* footer bar */
 #footer-bar {
     height: 3;

@@ -49,10 +49,9 @@ class MusterApp(App):
     SHOW_FOOTER = False
 
     BINDINGS = [
-        Binding("q", "quit", "Quit"),
+        Binding("ctrl+q", "quit", "Quit"),
+        Binding("ctrl+s", "stop_all", "Stop All"),
         Binding("r", "refresh_env", "Refresh Env"),
-        Binding("a", "start_all", "Start All"),
-        Binding("s", "stop_all", "Stop All"),
         Binding("enter", "toggle_service", "Toggle"),
         Binding("R", "restart_service", "Restart"),
         Binding("t", "cycle_cmd_mode", "Mode"),
@@ -154,10 +153,9 @@ class MusterApp(App):
     def _footer_text(self) -> str:
         """Build the footer shortcut hint text with Rich markup."""
         return (
-            "[#e5a23e]q[/] quit  "
+            "[#e5a23e]^q[/] quit  "
+            "[#e5a23e]^s[/] stop-all  "
             "[#e5a23e]r[/] refresh  "
-            "[#e5a23e]a[/] start-all  "
-            "[#e5a23e]s[/] stop-all  "
             "[#e5a23e]enter[/] toggle  "
             "[#e5a23e]R[/] restart  "
             "[#e5a23e]t[/] mode  "
@@ -375,15 +373,6 @@ class MusterApp(App):
             asyncio.create_task(self._orchestrator.stop(svc))
         else:
             asyncio.create_task(self._orchestrator.start_with_deps(svc, self.cmd_mode))
-
-    def action_start_all(self) -> None:
-        """Start every service in the current group filter."""
-        for svc in self._filtered_services():
-            if svc.status != Status.RUNNING:
-                asyncio.create_task(
-                    self._orchestrator.start_with_deps(svc, self.cmd_mode)
-                )
-        self.notify("Starting all services...", severity="information")
 
     def action_stop_all(self) -> None:
         """Stop every service across all groups."""
