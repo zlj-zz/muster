@@ -33,8 +33,9 @@ async def kill_port_owner(port: int) -> None:
 async def _kill_port_owner_unix(port: int) -> None:
     """Unix implementation using ``lsof``.
 
-    Uses the user's preferred ``$SHELL`` (falling back to ``/bin/sh``) so that
-    shell builtins and aliases are available.
+    Sends ``SIGTERM`` first, waits 2 s, then escalates to ``SIGKILL`` for any
+    process that is still alive.  Uses the user's preferred ``$SHELL`` (falling
+    back to ``/bin/sh``) so that shell builtins and aliases are available.
     """
     try:
         shell = os.environ.get("SHELL", "/bin/sh")
@@ -45,15 +46,32 @@ async def _kill_port_owner_unix(port: int) -> None:
             executable=shell,
         )
         stdout, _ = await proc.communicate()
+        pids: list[int] = []
         for pid_str in stdout.decode("utf-8", errors="replace").strip().splitlines():
             try:
                 pid = int(pid_str.strip())
-                os.kill(pid, signal.SIGKILL)
+                os.kill(pid, signal.SIGTERM)
+                pids.append(pid)
             except (ValueError, ProcessLookupError, PermissionError):
                 # Process may have exited between listing and kill, or we may
                 # lack permission. Either way, continue to the next PID.
                 pass
-    except Exception:
+
+        if not pids:
+            return
+
+        # Give processes a grace period to shut down cleanly.
+        await asyncio.sleep(2.0)
+
+        # Second pass: force-kill anything that survived SIGTERM.
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+    except asyncio.CancelledError:
+        raise
+    except (OSError, ValueError):
         pass
 
 
@@ -83,5 +101,7 @@ async def _kill_port_owner_windows(port: int) -> None:
                 os.kill(pid, signal.SIGTERM)
             except (ProcessLookupError, PermissionError):
                 pass
-    except Exception:
+    except asyncio.CancelledError:
+        raise
+    except (OSError, ValueError):
         pass

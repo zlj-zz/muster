@@ -375,7 +375,16 @@ class ServiceOrchestrator:
                     f"{svc.name} process exited abnormally (code={returncode})", "error"
                 )
         except asyncio.CancelledError:
-            pass
+            # Ensure the subprocess is reaped so it doesn't become a zombie.
+            # If stop() has already sent SIGTERM/SIGKILL, this returns quickly.
+            # Capture proc locally: stop() may set svc.proc to None concurrently.
+            proc = svc.proc
+            if proc and proc.returncode is None:
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=3.0)
+                except asyncio.TimeoutError:
+                    pass
+            raise
 
     async def _health_check(self, svc: Service) -> None:
         """Poll the service's TCP port until it accepts connections.
