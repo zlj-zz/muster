@@ -5,7 +5,6 @@ Renders a simple :class:`Tree` whose leaf nodes are YAML file names.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
 
 from textual import on
 from textual.message import Message
@@ -21,12 +20,12 @@ class FileList(Tree):
 
     def __init__(
         self,
-        files: List[str],
+        files: list[str],
         **kwargs,
     ) -> None:
         super().__init__("Files", **kwargs)
         self.files = files
-        self._node_map: Dict[str, Tree.TreeNode] = {}
+        self._node_map: dict[str, Tree.TreeNode] = {}
         self.show_root = False
         self.guide_depth = 2
         self.border_title = "Files"
@@ -39,7 +38,7 @@ class FileList(Tree):
             self._node_map[name] = leaf
 
     @property
-    def current_file(self) -> Optional[str]:
+    def current_file(self) -> str | None:
         """Return the file path of the currently highlighted node."""
         node = self.cursor_node
         if node and isinstance(node.data, str):

@@ -6,8 +6,6 @@ lines with standard terminal mouse/keyboard interactions.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from textual.widgets import TextArea
 
 from ..models import Service
@@ -18,13 +16,13 @@ class LogPanel(TextArea):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(read_only=True, show_line_numbers=False, **kwargs)
-        self._svc_name: Optional[str] = None
+        self._svc_name: str | None = None
 
     def on_mount(self) -> None:
         self.border_title = "Logs"
         self.cursor_blink = False
 
-    def set_service(self, svc: Optional[Service]) -> None:
+    def set_service(self, svc: Service | None) -> None:
         """Switch the panel to display a different service's logs.
 
         Args:

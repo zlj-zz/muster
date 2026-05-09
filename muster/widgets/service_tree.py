@@ -5,8 +5,6 @@ aggregation, api, etc.) and whose leaf nodes are the actual services.  Each
 leaf shows a coloured status dot, the service name, and its port.
 """
 
-from typing import Dict, List, Optional
-
 from rich.style import Style
 from rich.text import Text
 from textual import on
@@ -27,16 +25,16 @@ class ServiceTree(Tree):
 
     def __init__(
         self,
-        services: List[Service],
-        groups: List[Group],
-        status_colors: Dict[str, str],
+        services: list[Service],
+        groups: list[Group],
+        status_colors: dict[str, str],
         **kwargs,
     ) -> None:
         super().__init__("Services", **kwargs)
         self.services = services
         self.groups = groups
         self.status_colors = status_colors
-        self._node_map: Dict[str, Tree.TreeNode] = {}
+        self._node_map: dict[str, Tree.TreeNode] = {}
         self.show_root = False
         self.guide_depth = 2
         self.border_title = "Services"
@@ -95,7 +93,7 @@ class ServiceTree(Tree):
             node.set_label(self._svc_label(svc))
 
     @property
-    def current_service(self) -> Optional[Service]:
+    def current_service(self) -> Service | None:
         """Return the service attached to the currently highlighted node."""
         node = self.cursor_node
         if node and isinstance(node.data, Service):

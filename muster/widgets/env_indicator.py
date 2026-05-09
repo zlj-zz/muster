@@ -6,7 +6,6 @@ at the bottom of the service-tree column.
 
 from __future__ import annotations
 
-from typing import List, Tuple
 
 from textual.widgets import Static
 
@@ -26,7 +25,7 @@ class EnvIndicator(Static):
         super().__init__(**kwargs)
         self._config = config
 
-    def refresh_indicators(self, results: List[Tuple[str, bool]]) -> None:
+    def refresh_indicators(self, results: list[tuple[str, bool]]) -> None:
         """Update indicator dots with pre-computed check results.
 
         Args:

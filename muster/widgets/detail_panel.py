@@ -7,11 +7,11 @@ status, port, dependencies, and command snippets) and provides ``Start``,
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
 
 from rich.syntax import Syntax
 from rich.text import Text
 from textual import on
+from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.reactive import reactive
@@ -28,10 +28,10 @@ class DetailPanel(Static):
             updates are automatic when it changes.
     """
 
-    current_service: reactive[Optional[Service]] = reactive(None)
+    current_service: reactive[Service | None] = reactive(None)
 
     def __init__(
-        self, groups: List[Group], status_colors: Dict[str, str], **kwargs
+        self, groups: list[Group], status_colors: dict[str, str], **kwargs
     ) -> None:
         super().__init__(**kwargs)
         self._groups = groups
@@ -46,7 +46,7 @@ class DetailPanel(Static):
                 yield Button.error("Stop", flat=True, id="btn-stop")
                 yield Button.warning("Restart", flat=True, id="btn-restart")
 
-    def watch_current_service(self, svc: Optional[Service]) -> None:
+    def watch_current_service(self, svc: Service | None) -> None:
         """React to service selection changes.
 
         Re-renders metadata, updates button states, and shows/hides the button
@@ -60,7 +60,7 @@ class DetailPanel(Static):
         buttons = self.query_one("#action-buttons", Horizontal)
         buttons.styles.display = "none" if svc is None else "block"
 
-    def _render_detail(self, svc: Optional[Service]) -> None:
+    def _render_detail(self, svc: Service | None) -> None:
         """Build and display the key/value metadata block.
 
         Args:
@@ -113,7 +113,7 @@ class DetailPanel(Static):
             Syntax(cmd, "bash", theme="monokai", background_color="default"),
         )
 
-    def _update_buttons(self, svc: Optional[Service]) -> None:
+    def _update_buttons(self, svc: Service | None) -> None:
         """Enable/disable action buttons based on service state.
 
         Args:

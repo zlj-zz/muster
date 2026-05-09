@@ -6,7 +6,6 @@ checks (etcd, MySQL, Redis, etc.) with a coloured status dot and address.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
 
 from rich.style import Style
 from rich.text import Text
@@ -33,7 +32,7 @@ class EnvList(Tree):
         super().__init__("Environment", **kwargs)
         self.env_checks = config.env_checks
         self.status_colors = config.status_colors
-        self._node_map: Dict[str, Tree.TreeNode] = {}
+        self._node_map: dict[str, Tree.TreeNode] = {}
         self.show_root = False
         self.guide_depth = 2
         self.border_title = "Environment"
@@ -46,7 +45,7 @@ class EnvList(Tree):
             leaf = self.root.add_leaf(label, data=ec)
             self._node_map[ec.name] = leaf
 
-    def _env_label(self, ec: EnvCheck, ok: Optional[bool]) -> Text:
+    def _env_label(self, ec: EnvCheck, ok: bool | None) -> Text:
         """Build the Rich ``Text`` label for an environment check node.
 
         Args:
@@ -80,7 +79,7 @@ class EnvList(Tree):
         text.append(f"  {result}", Style(color=dim_color))
         return text
 
-    def refresh_checks(self, results: List[tuple[str, bool]]) -> None:
+    def refresh_checks(self, results: list[tuple[str, bool]]) -> None:
         """Update node labels with fresh check results.
 
         Args:
@@ -96,7 +95,7 @@ class EnvList(Tree):
                 node.set_label(self._env_label(node.data, ok))
 
     @property
-    def current_env(self) -> Optional[EnvCheck]:
+    def current_env(self) -> EnvCheck | None:
         """Return the env check attached to the currently highlighted node."""
         node = self.cursor_node
         if node and isinstance(node.data, EnvCheck):

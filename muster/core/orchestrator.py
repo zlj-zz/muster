@@ -11,7 +11,7 @@ import asyncio
 import os
 import signal
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
 
 from ..models import MusterConfig, Service, Status
 from .process import kill_port_owner
@@ -35,7 +35,7 @@ class ServiceOrchestrator:
     def __init__(
         self,
         config: MusterConfig,
-        registry: Dict[str, Service],
+        registry: dict[str, Service],
         *,
         on_log: Callable[[str, str], None] = lambda _s, _l: None,
         on_status: Callable[[Service], None] = lambda _s: None,
@@ -46,8 +46,8 @@ class ServiceOrchestrator:
         self._on_log = on_log
         self._on_status = on_status
         self._on_notify = on_notify
-        self._reader_tasks: Dict[str, asyncio.Task] = {}
-        self._health_tasks: Dict[str, asyncio.Task] = {}
+        self._reader_tasks: dict[str, asyncio.Task] = {}
+        self._health_tasks: dict[str, asyncio.Task] = {}
 
     # ---------- internal helpers ----------
 
@@ -297,7 +297,7 @@ class ServiceOrchestrator:
         await asyncio.sleep(0.5)
         await self.start_with_deps(svc, mode)
 
-    async def stop_all(self, services: List[Service]) -> None:
+    async def stop_all(self, services: list[Service]) -> None:
         """Stop all given services.
 
         Args:

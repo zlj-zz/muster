@@ -8,14 +8,13 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Set
 
 from ..models import Group, PortDiscovery, Service
 
 
 def resolve_dependencies(
-    target_names: List[str], registry: Dict[str, Service]
-) -> List[Service]:
+    target_names: list[str], registry: dict[str, Service]
+) -> list[Service]:
     """Topologically sort services via DFS dependency resolution.
 
     Traverses the dependency graph starting from ``target_names``, visiting
@@ -32,10 +31,10 @@ def resolve_dependencies(
     Raises:
         ValueError: If a circular dependency is detected.
     """
-    visited: Set[str] = set()
-    result: List[Service] = []
+    visited: set[str] = set()
+    result: list[Service] = []
 
-    def dfs(name: str, path: Set[str]) -> None:
+    def dfs(name: str, path: set[str]) -> None:
         """Recursive DFS helper.
 
         Args:
@@ -64,7 +63,7 @@ def resolve_dependencies(
     return result
 
 
-def sort_by_group(services: List[Service], groups: List[Group]) -> List[Service]:
+def sort_by_group(services: list[Service], groups: list[Group]) -> list[Service]:
     """Sort services by their group's ``order`` field.
 
     Args:
@@ -78,7 +77,7 @@ def sort_by_group(services: List[Service], groups: List[Group]) -> List[Service]
     return sorted(services, key=lambda s: order_map.get(s.group, 999))
 
 
-def resolve_port(svc_name: str, discovery: PortDiscovery) -> Optional[int]:
+def resolve_port(svc_name: str, discovery: PortDiscovery) -> int | None:
     """Auto-discover a service's listening port from its configuration files.
 
     Scans ``<svc_name>/etc/*.yaml`` (excluding environment-specific files) and
@@ -98,7 +97,7 @@ def resolve_port(svc_name: str, discovery: PortDiscovery) -> Optional[int]:
     if not cfg_dir.exists():
         return None
 
-    yaml_file: Optional[Path] = None
+    yaml_file: Path | None = None
     # Pick the first non-excluded YAML file alphabetically.
     for f in sorted(cfg_dir.glob(discovery.config_pattern)):
         if re.search(discovery.exclude_pattern, str(f)):

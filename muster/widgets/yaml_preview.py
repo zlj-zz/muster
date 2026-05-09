@@ -6,8 +6,6 @@ Displays the contents of a YAML file in a read-only ``TextArea``.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
-
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.reactive import reactive
@@ -21,7 +19,7 @@ class YamlPreview(Vertical):
         current_file: Path to the currently displayed file.
     """
 
-    current_file: reactive[Optional[str]] = reactive(None)
+    current_file: reactive[str | None] = reactive(None)
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -30,7 +28,7 @@ class YamlPreview(Vertical):
         yield Static("Preview", id="yaml-title")
         yield TextArea(read_only=True, language="yaml", id="yaml-text")
 
-    def watch_current_file(self, file_path: Optional[str]) -> None:
+    def watch_current_file(self, file_path: str | None) -> None:
         """React to file selection changes.
 
         Reads the file from disk and updates the text area.

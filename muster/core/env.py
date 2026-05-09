@@ -7,7 +7,6 @@ and returns pass/fail results for display in the TUI status bar.
 from __future__ import annotations
 
 import socket
-from typing import List, Tuple
 
 from ..models import EnvCheck
 
@@ -31,7 +30,7 @@ def check_tcp(host: str, port: int, timeout: float = 1.0) -> bool:
         return False
 
 
-def check_env(env_checks: List[EnvCheck]) -> List[Tuple[str, bool]]:
+def check_env(env_checks: list[EnvCheck]) -> list[tuple[str, bool]]:
     """Run all configured environment checks and return (name, ok) pairs.
 
     Args:
@@ -40,7 +39,7 @@ def check_env(env_checks: List[EnvCheck]) -> List[Tuple[str, bool]]:
     Returns:
         Ordered list of ``(check_name, is_ok)`` tuples.
     """
-    results: List[Tuple[str, bool]] = []
+    results: list[tuple[str, bool]] = []
     for ec in env_checks:
         if ec.type == "tcp":
             ok = check_tcp(ec.host or "127.0.0.1", ec.port or 0) if ec.port else False

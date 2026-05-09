@@ -10,7 +10,6 @@ from __future__ import annotations
 import asyncio
 import glob
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -68,9 +67,9 @@ class MusterApp(App):
     def __init__(
         self,
         config: MusterConfig,
-        services: List[Service],
-        registry: Dict[str, Service],
-        config_path: Optional[Path] = None,
+        services: list[Service],
+        registry: dict[str, Service],
+        config_path: Path | None = None,
         cmd_mode: str = "default",
         **kwargs,
     ) -> None:
@@ -80,7 +79,7 @@ class MusterApp(App):
         self.registry = registry
         self._config_path = config_path
         self.cmd_mode = cmd_mode
-        self._group_filter: Optional[str] = None
+        self._group_filter: str | None = None
         self._cleaned_up = False
         self._orchestrator = ServiceOrchestrator(
             config,
@@ -91,7 +90,7 @@ class MusterApp(App):
         )
         self._yaml_files = self._scan_yaml_files()
 
-    def _scan_yaml_files(self) -> List[str]:
+    def _scan_yaml_files(self) -> list[str]:
         """Scan for YAML files in the config directory."""
         if self._config_path is None:
             return []
@@ -100,7 +99,7 @@ class MusterApp(App):
         return [Path(f).name for f in files]
 
     @property
-    def _common_cmd_modes(self) -> List[str]:
+    def _common_cmd_modes(self) -> list[str]:
         """Return cmd modes shared by all services (for cycling).
 
         The intersection of every service's ``cmd_modes`` gives the set of
@@ -223,7 +222,7 @@ class MusterApp(App):
         except Exception as e:
             self.log.error(f"append_log failed: {e}")
 
-    def _filtered_services(self) -> List[Service]:
+    def _filtered_services(self) -> list[Service]:
         """Return services matching the current group filter.
 
         Returns:

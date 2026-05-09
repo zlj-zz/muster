@@ -6,8 +6,6 @@ most recent test results.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.reactive import reactive
@@ -24,7 +22,7 @@ class EnvDetailPanel(Static):
             are automatic when it changes.
     """
 
-    current_env: reactive[Optional[EnvCheck]] = reactive(None)
+    current_env: reactive[EnvCheck | None] = reactive(None)
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -34,11 +32,11 @@ class EnvDetailPanel(Static):
         """Build the widget hierarchy."""
         yield Static(id="env-detail-content")
 
-    def watch_current_env(self, env: Optional[EnvCheck]) -> None:
+    def watch_current_env(self, env: EnvCheck | None) -> None:
         """React to env check selection changes."""
         self._render_detail(env)
 
-    def _render_detail(self, env: Optional[EnvCheck]) -> None:
+    def _render_detail(self, env: EnvCheck | None) -> None:
         """Build and display the key/value metadata block.
 
         Args:

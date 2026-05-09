@@ -6,7 +6,6 @@ and the top-level ``cmd_test`` shorthand.
 """
 
 from pathlib import Path
-from typing import List, Tuple
 
 import yaml
 
@@ -40,7 +39,7 @@ DEFAULT_PORT_DISCOVERY = PortDiscovery(
 )
 
 
-def load_config(yaml_path: Path) -> Tuple[MusterConfig, List[Service]]:
+def load_config(yaml_path: Path) -> tuple[MusterConfig, list[Service]]:
     """Load muster configuration and service registry from a YAML file.
 
     Args:
@@ -94,7 +93,7 @@ def load_config(yaml_path: Path) -> Tuple[MusterConfig, List[Service]]:
     )
 
     # services (backward-compat: accept "layer" as alias for "group")
-    services: List[Service] = []
+    services: list[Service] = []
     for item in data.get("services", []):
         group_id = item.get("group") or item.get("layer", "")
         # backward-compat: "cmd_test" top-level key -> merge into cmd dict

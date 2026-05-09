@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Union
 
 
 class Status(Enum):
@@ -58,12 +57,12 @@ class EnvCheck:
 
     name: str
     type: str  # tcp | http | proc
-    host: Optional[str] = None
-    port: Optional[int] = None
-    url: Optional[str] = None
-    method: Optional[str] = None
-    expect_status: Optional[int] = None
-    pattern: Optional[str] = None
+    host: str | None = None
+    port: int | None = None
+    url: str | None = None
+    method: str | None = None
+    expect_status: int | None = None
+    pattern: str | None = None
 
 
 @dataclass
@@ -85,7 +84,7 @@ class PortDiscovery:
     config_dir: str = "etc"
     config_pattern: str = "*.yaml"
     exclude_pattern: str = r"_(test|prod|pre)\.yaml$"
-    rules: List[Dict[str, str]] = field(default_factory=list)
+    rules: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -108,15 +107,15 @@ class Service:
     """
 
     name: str
-    cmd: Union[str, Dict[str, str]]
+    cmd: str | dict[str, str]
     group: str
-    port: Optional[int] = None
-    depends_on: List[str] = field(default_factory=list)
+    port: int | None = None
+    depends_on: list[str] = field(default_factory=list)
 
     # runtime state
     status: Status = Status.STOPPED
-    proc: Optional[asyncio.subprocess.Process] = None
-    log_lines: List[str] = field(default_factory=list)
+    proc: asyncio.subprocess.Process | None = None
+    log_lines: list[str] = field(default_factory=list)
 
     def cmd_for(self, mode: str) -> str:
         """Return the command string for the given mode.
@@ -134,7 +133,7 @@ class Service:
         return self.cmd
 
     @property
-    def cmd_modes(self) -> List[str]:
+    def cmd_modes(self) -> list[str]:
         """Return all available command mode names.
 
         Returns:
@@ -157,10 +156,10 @@ class MusterConfig:
         port_discovery: Rules for automatic port extraction.
     """
 
-    env_checks: List[EnvCheck]
-    groups: List[Group]
+    env_checks: list[EnvCheck]
+    groups: list[Group]
     port_discovery: PortDiscovery
-    status_colors: Dict[str, str] = field(
+    status_colors: dict[str, str] = field(
         default_factory=lambda: {
             "stopped": "#5c6370",
             "starting": "#e5c07b",
