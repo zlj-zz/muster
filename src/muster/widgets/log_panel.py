@@ -1,12 +1,14 @@
-"""Read-only log panel with search.
+"""Read-only log panel with search and level filtering.
 
-Layout: ``Input`` (search) on top, ``TextArea`` (logs) below.
-The search box filters lines in-place; pressing *Enter* jumps to the first
-match and the panel title shows the match counter.
+Layout: level filter row on top, ``Input`` (search) below, then
+``TextArea`` (logs).  The search box filters lines in-place; pressing
+*Enter* jumps to the first match and the panel title shows the match
+counter.  Level filter buttons restrict visible lines by parsed severity.
 """
 
 from __future__ import annotations
 
+import re
 from collections import deque
 
 from textual import events, on
@@ -16,19 +18,47 @@ from textual.widgets import Input, Static, TextArea
 
 from ..models import Service
 
+#: Regex patterns for parsing Go-style log levels.
+LEVEL_PATTERNS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"(?:\[)?(?:FATAL|PANIC)(?:\]|\s)", re.I), "ERROR"),
+    (re.compile(r"(?:\[)?(?:ERROR|ERRO)(?:\]|\s)", re.I), "ERROR"),
+    (re.compile(r"(?:\[)?(?:WARN|WARNING)(?:\]|\s)", re.I), "WARN"),
+    (re.compile(r"(?:\[)?(?:INFO)(?:\]|\s)", re.I), "INFO"),
+    (re.compile(r"(?:\[)?(?:DEBUG|DEBU)(?:\]|\s)", re.I), "DEBUG"),
+]
+
+#: Prefixes that identify muster system log lines.
+SYS_PREFIXES = ("muster▸", "!!!")
+
+#: Bidirectional mapping between widget IDs and level strings.
+_LEVEL_MAP: dict[str, str] = {
+    "level-all": "ALL",
+    "level-err": "ERROR",
+    "level-warn": "WARN",
+    "level-info": "INFO",
+}
+
 
 class LogPanel(Vertical):
-    """Service log viewer with a 2000-line rolling buffer and search."""
+    """Service log viewer with a 2000-line rolling buffer, search, and level filter."""
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._svc_name: str | None = None
         self._buffer: deque[str] = deque(maxlen=2000)
+        self._displayed_lines: list[str] = []
         self._matches: list[int] = []
         self._match_idx: int = -1
         self._search_dirty: bool = True
+        self._log_level: str = "ALL"
+        self._level_buttons: dict[str, Static] = {}
 
     def compose(self) -> ComposeResult:
+        with Horizontal(id="log-level-row"):
+            yield Static("ALL", classes="log-level-btn active", id="level-all")
+            yield Static("ERR", classes="log-level-btn", id="level-err")
+            yield Static("WARN", classes="log-level-btn", id="level-warn")
+            yield Static("INFO", classes="log-level-btn", id="level-info")
         with Horizontal(id="log-search-row"):
             yield Static("❯ ", id="log-search-prefix")
             yield Input(
@@ -40,6 +70,8 @@ class LogPanel(Vertical):
 
     def on_mount(self) -> None:
         self.border_title = "Logs"
+        for widget_id, level in _LEVEL_MAP.items():
+            self._level_buttons[level] = self.query_one(f"#{widget_id}", Static)
 
     @property
     def _text_area(self) -> TextArea:
@@ -58,13 +90,69 @@ class LogPanel(Vertical):
         if not self._matches:
             self._search_count.update("")
             return
-        self._search_count.update(
-            f"{self._match_idx + 1}/{len(self._matches)}"
-        )
+        self._search_count.update(f"{self._match_idx + 1}/{len(self._matches)}")
+
+    def _sync_text_area(self) -> None:
+        """Push ``_displayed_lines`` into the TextArea and scroll to bottom."""
+        self._text_area.text = "\n".join(self._displayed_lines)
+        if self._displayed_lines:
+            self._text_area.move_cursor((len(self._displayed_lines) - 1, 0))
+            self._text_area.scroll_end(animate=False)
+
+    def _parse_level(self, line: str) -> str:
+        for pattern, level in LEVEL_PATTERNS:
+            if pattern.search(line):
+                return level
+        if any(line.startswith(p) for p in SYS_PREFIXES):
+            return "SYS"
+        return "INFO"
+
+    def _is_visible(self, line: str) -> bool:
+        level = self._parse_level(line)
+        if self._log_level == "ALL":
+            return True
+        return level == self._log_level
+
+    def _rebuild_display(self) -> None:
+        """Rebuild displayed lines from buffer using current filter."""
+        self._displayed_lines = [ln for ln in self._buffer if self._is_visible(ln)]
+        self._sync_text_area()
+
+    def _set_level(self, level: str) -> None:
+        """Switch log level filter and refresh display."""
+        if self._log_level == level:
+            return
+        self._log_level = level
+        self._update_level_buttons()
+        self._rebuild_display()
+        self._matches = []
+        self._match_idx = -1
+        query = self._search_input.value.strip()
+        if query:
+            self._do_search(query)
+        else:
+            self.border_title = self._log_prefix
+            self._update_search_count()
+
+    def _update_level_buttons(self) -> None:
+        for level, btn in self._level_buttons.items():
+            if level == self._log_level:
+                btn.add_class("active")
+            else:
+                btn.remove_class("active")
+
+    @on(events.Click)
+    def on_level_click(self, event: events.Click) -> None:
+        widget = event.control
+        if widget is None or widget.id not in _LEVEL_MAP:
+            return
+        self._set_level(_LEVEL_MAP[widget.id])
+        event.stop()
 
     def clear(self) -> None:
         self._text_area.clear()
         self._buffer.clear()
+        self._displayed_lines = []
         self._matches = []
         self._match_idx = -1
         self._search_input.value = ""
@@ -86,9 +174,7 @@ class LogPanel(Vertical):
         self.border_title = f"Logs: {svc.name}"
         if svc.log_lines:
             self._buffer = deque(svc.log_lines, maxlen=2000)
-            self._text_area.text = "\n".join(self._buffer)
-            self._text_area.move_cursor((len(self._buffer) - 1, 0))
-            self._text_area.scroll_end(animate=False)
+            self._rebuild_display()
 
     def append_log(self, svc_name: str, line: str) -> None:
         """Append a single log line if it belongs to the currently shown service.
@@ -99,10 +185,13 @@ class LogPanel(Vertical):
         """
         if self._svc_name != svc_name:
             return
+        was_full = len(self._buffer) == self._buffer.maxlen
         self._buffer.append(line)
-        self._text_area.text = "\n".join(self._buffer)
-        self._text_area.move_cursor((len(self._buffer) - 1, 0))
-        self._text_area.scroll_end(animate=False)
+        if was_full:
+            self._rebuild_display()
+        elif self._is_visible(line):
+            self._displayed_lines.append(line)
+            self._sync_text_area()
 
     @on(Input.Changed, "#log-search")
     def on_search_changed(self, event: Input.Changed) -> None:
@@ -135,12 +224,11 @@ class LogPanel(Vertical):
         """Find all lines matching *query* and jump to the first match."""
         self._matches = []
         self._match_idx = -1
-        if not query or not self._buffer:
+        if not query or not self._displayed_lines:
             self.border_title = self._log_prefix
             return
 
-        lines = list(self._buffer)
-        self._matches = [i for i, ln in enumerate(lines) if query in ln]
+        self._matches = [i for i, ln in enumerate(self._displayed_lines) if query in ln]
 
         if self._matches:
             self._match_idx = 0
@@ -175,7 +263,7 @@ class LogPanel(Vertical):
             ta.move_cursor((line_idx, 0))
             return
 
-        line_text = self._buffer[line_idx]
+        line_text = self._displayed_lines[line_idx]
         col_idx = line_text.find(query)
         if col_idx >= 0:
             end_col = col_idx + len(query)

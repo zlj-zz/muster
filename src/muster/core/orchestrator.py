@@ -78,7 +78,7 @@ class ServiceOrchestrator:
         """
         label = "" if is_target else f"Dep {dep.name} "
         msg = f"{label}{reason}, aborting {target.name} start"
-        self._log(target.name, f">>> {msg}")
+        self._log(target.name, f"muster▸{msg}")
         self._notify(msg, "error")
 
     # ---------- public API ----------
@@ -103,7 +103,7 @@ class ServiceOrchestrator:
             return
 
         dep_names = [d.name for d in deps]
-        self._log(svc.name, f">>> Dependencies: {dep_names}")
+        self._log(svc.name, f"muster▸Dependencies: {dep_names}")
 
         # Pre-emptively kill any process already bound to the target port so
         # that the new instance can bind cleanly.
@@ -113,7 +113,7 @@ class ServiceOrchestrator:
                 import socket
 
                 with socket.create_connection(("127.0.0.1", port), timeout=1.0):
-                    self._log(svc.name, f">>> Port {port} in use, cleaning up...")
+                    self._log(svc.name, f"muster▸Port {port} in use, cleaning up...")
                     await kill_port_owner(port)
             except OSError:
                 pass
@@ -121,12 +121,12 @@ class ServiceOrchestrator:
         # Build launch plan: one layer per group, ordered by group.order.
         order_map = {g.id: g.order for g in self.config.groups}
         layers = sorted(set(d.group for d in deps), key=lambda g: order_map.get(g, 999))
-        self._log(svc.name, f">>> Groups: {layers}")
+        self._log(svc.name, f"muster▸Groups: {layers}")
 
         for layer in layers:
             layer_svcs = [d for d in deps if d.group == layer]
             layer_names = [s.name for s in layer_svcs]
-            self._log(svc.name, f">>> Starting [{layer}] group: {layer_names}")
+            self._log(svc.name, f"muster▸Starting [{layer}] group: {layer_names}")
 
             # Kick off every service in this layer that is not already running.
             for s in layer_svcs:
@@ -141,20 +141,20 @@ class ServiceOrchestrator:
                             ):
                                 self._log(
                                     svc.name,
-                                    f">>> Dep {s.name} port {p} in use, cleaning up...",
+                                    f"muster▸Dep {s.name} port {p} in use, cleaning up...",
                                 )
                                 await kill_port_owner(p)
                         except OSError:
                             pass
                     self._log(
                         svc.name,
-                        f">>> Scheduling start: {s.name} (status: {s.status.value})",
+                        f"muster▸Scheduling start: {s.name} (status: {s.status.value})",
                     )
                     asyncio.create_task(self.start(s, mode))
                 else:
                     self._log(
                         svc.name,
-                        f">>> Skipping start: {s.name} (status: {s.status.value})",
+                        f"muster▸Skipping start: {s.name} (status: {s.status.value})",
                     )
 
             # Wait for the whole layer to reach a terminal state.
@@ -164,15 +164,15 @@ class ServiceOrchestrator:
                     if s.status == Status.FAILED:
                         self._abort_start(svc, s, is_target, "start failed")
                         return
-                    self._log(svc.name, f">>> {s.name} already running, skip wait")
+                    self._log(svc.name, f"muster▸{s.name} already running, skip wait")
                     continue
                 self._log(
                     svc.name,
-                    f">>> Waiting for {s.name} ready (current: {s.status.value})...",
+                    f"muster▸Waiting for {s.name} ready (current: {s.status.value})...",
                 )
                 for _ in range(180):
                     if s.status == Status.RUNNING:
-                        self._log(svc.name, f">>> {s.name} ready")
+                        self._log(svc.name, f"muster▸{s.name} ready")
                         break
                     if s.status == Status.FAILED:
                         self._abort_start(svc, s, is_target, "start failed")
@@ -210,8 +210,8 @@ class ServiceOrchestrator:
             logfile.parent.mkdir(exist_ok=True)
 
             svc.log_lines = [
-                f">>> Command: {cmd}",
-                ">>> Compiling (first start may take a few seconds)...",
+                f"muster▸Command: {cmd}",
+                "muster▸Compiling (first start may take a few seconds)...",
             ]
             for line in svc.log_lines:
                 self._log(svc.name, line)
@@ -226,7 +226,7 @@ class ServiceOrchestrator:
             )
             svc.proc = proc
             svc.start_time = datetime.now()
-            pid_msg = f">>> Process PID: {proc.pid}"
+            pid_msg = f"muster▸Process PID: {proc.pid}"
             svc.log_lines.append(pid_msg)
             self._log(svc.name, pid_msg)
 
@@ -254,7 +254,7 @@ class ServiceOrchestrator:
         if svc.status == Status.STOPPED:
             return
 
-        stop_msg = ">>> Stopping service..."
+        stop_msg = "muster▸Stopping service..."
         svc.log_lines.append(stop_msg)
         self._log(svc.name, stop_msg)
 
@@ -284,7 +284,7 @@ class ServiceOrchestrator:
         svc.proc = None
         svc.start_time = None
         self._set_status(svc, Status.STOPPED)
-        stopped_msg = ">>> Service stopped"
+        stopped_msg = "muster▸Service stopped"
         svc.log_lines.append(stopped_msg)
         self._log(svc.name, stopped_msg)
         self._notify(f"{svc.name} stopped", "information")
@@ -364,7 +364,7 @@ class ServiceOrchestrator:
             return
         try:
             returncode = await svc.proc.wait()
-            exit_msg = f">>> Process exit code: {returncode}"
+            exit_msg = f"muster▸Process exit code: {returncode}"
             svc.log_lines.append(exit_msg)
             self._log(svc.name, exit_msg)
 
@@ -403,23 +403,25 @@ class ServiceOrchestrator:
             for i in range(60):
                 if svc.proc is None or svc.proc.returncode is not None:
                     self._set_status(svc, Status.FAILED)
-                    self._log(svc.name, ">>> Process exited, health check failed")
+                    self._log(svc.name, "muster▸Process exited, health check failed")
                     return
                 try:
                     with socket.create_connection(("127.0.0.1", port), timeout=1.0):
                         self._set_status(svc, Status.RUNNING)
                         svc.port = port
-                        self._log(svc.name, f">>> Service ready (port {port})")
+                        self._log(svc.name, f"muster▸Service ready (port {port})")
                         self._notify(f"{svc.name} ready (:{port})", "success")
                         return
                 except OSError:
                     pass
                 if i % 5 == 0:
-                    self._log(svc.name, f">>> Waiting for port {port} ready... ({i}s)")
+                    self._log(
+                        svc.name, f"muster▸Waiting for port {port} ready... ({i}s)"
+                    )
                 await asyncio.sleep(1)
 
             self._set_status(svc, Status.FAILED)
-            self._log(svc.name, f">>> Port {port} not ready, health check timeout")
+            self._log(svc.name, f"muster▸Port {port} not ready, health check timeout")
             self._notify(f"{svc.name} port {port} not ready", "error")
         except Exception as e:
             err = f"!!! Health check error: {e}"

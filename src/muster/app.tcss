@@ -233,6 +233,29 @@ Tree > .tree--highlight {
     padding: 1;
 }
 
+#log-level-row {
+    height: 1;
+    background: #282c34;
+    padding: 0 1;
+}
+
+.log-level-btn {
+    width: auto;
+    color: #5c6370;
+    content-align: center middle;
+    padding: 0 1;
+}
+
+.log-level-btn:hover {
+    color: #abb2bf;
+    text-style: none;
+}
+
+.log-level-btn.active {
+    color: #eab459;
+    text-style: bold;
+}
+
 #log-search-row {
     height: 1;
     background: #eab459;
