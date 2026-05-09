@@ -33,8 +33,17 @@ def main() -> None:
     yaml_path = Path(args.file)
     try:
         config, services = load_config(yaml_path)
-    except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
+    except FileNotFoundError:
+        print(
+            f"muster: config file not found: {yaml_path}\n"
+            f"\n"
+            f"  Create one with:\n"
+            f"    cp example/muster-compose.yaml ./{yaml_path.name}\n"
+            f"\n"
+            f"  Or specify a different file:\n"
+            f"    muster -f <path>\n",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # Auto-resolve ports if port_discovery is enabled in the config.

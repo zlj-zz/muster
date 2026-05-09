@@ -92,7 +92,11 @@ def _list_processes() -> list[str]:
                 timeout=5.0,
                 check=False,
             )
-            return [line.split(",")[0].strip('"') for line in proc.stdout.splitlines() if line]
+            return [
+                line.split(",")[0].strip('"')
+                for line in proc.stdout.splitlines()
+                if line
+            ]
         else:
             proc = subprocess.run(
                 ["ps", "-A", "-o", "comm="],
