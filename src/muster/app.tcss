@@ -233,6 +233,41 @@ Tree > .tree--highlight {
     padding: 1;
 }
 
+#log-search-row {
+    height: 1;
+    background: #eab459;
+    padding: 0 1;
+}
+
+#log-search-prefix {
+    width: auto;
+    color: #1e2227;
+    content-align: center middle;
+}
+
+#log-search {
+    width: 1fr;
+    height: 1;
+    border: none;
+    background: transparent;
+    color: #1e2227;
+    padding: 0;
+}
+
+#log-search:focus {
+    border: none;
+}
+
+#log-search-count {
+    width: auto;
+    color: #1e2227;
+    content-align: center middle;
+}
+
+#log-text {
+    height: 1fr;
+}
+
 TextArea {
     background: transparent;
     border: none;
@@ -240,6 +275,11 @@ TextArea {
 
 TextArea:focus {
     border: none;
+}
+
+#log-text .text-area--selection {
+    background: #eab459;
+    color: #1e2227;
 }
 
 /* ========== Env Detail Panel ========== */
@@ -289,7 +329,7 @@ Tree, TextArea, VerticalScroll, DataTable {
     scrollbar-background: transparent;
     scrollbar-color-hover: #abb2bf;
     scrollbar-background-hover: transparent;
-    scrollbar-color-active: #e5a23e;
+    scrollbar-color-active: #eab459;
     scrollbar-background-active: transparent;
 }
 
@@ -312,6 +352,6 @@ Tree, TextArea, VerticalScroll, DataTable {
     background: #3e4451;
     color: #abb2bf;
     padding: 0 2;
-    border-left: thick #e5a23e;
+    border-left: thick #eab459;
     content-align: center middle;
 }

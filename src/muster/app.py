@@ -156,13 +156,13 @@ class MusterApp(App):
     def _footer_text(self) -> str:
         """Build the footer shortcut hint text with Rich markup."""
         return (
-            "[#e5a23e]^q[/] quit  "
-            "[#e5a23e]^s[/] stop-all  "
-            "[#e5a23e]r[/] refresh  "
-            "[#e5a23e]enter[/] toggle  "
-            "[#e5a23e]R[/] restart  "
-            "[#e5a23e]t[/] mode  "
-            "[#e5a23e]l[/] filter"
+            "[#eab459]^q[/] quit  "
+            "[#eab459]^s[/] stop-all  "
+            "[#eab459]r[/] refresh  "
+            "[#eab459]enter[/] toggle  "
+            "[#eab459]R[/] restart  "
+            "[#eab459]t[/] mode  "
+            "[#eab459]l[/] filter"
         )
 
     def on_mount(self) -> None:

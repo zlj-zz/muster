@@ -39,9 +39,9 @@ class ActivityTab(Static):
     }
     ActivityTab.active {
         background: #282c34;
-        color: #e5a23e;
+        color: #eab459;
         text-style: bold;
-        border-left: inner #e5a23e;
+        border-left: inner #eab459;
     }
     """
 
