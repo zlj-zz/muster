@@ -13,7 +13,6 @@ import sys
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Self
 
 from rich.segment import Segment
 from rich.style import Style
@@ -139,7 +138,7 @@ class InteractiveRichLog(RichLog):
             self._meta.append(_LineMeta(text, level, line_no))
         self._rebuild()
 
-    def clear(self) -> Self:  # type: ignore[override]
+    def clear(self) -> InteractiveRichLog:  # type: ignore[override]
         """Clear all logs."""
         self._rebuild_scheduled = False
         self._meta.clear()
