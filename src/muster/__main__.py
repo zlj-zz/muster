@@ -11,6 +11,7 @@ from pathlib import Path
 from .app import MusterApp
 from .config import load_config
 from .core.resolver import resolve_port
+from .core.validator import ConfigError, validate_config
 
 
 def main() -> None:
@@ -44,6 +45,14 @@ def main() -> None:
             f"    muster -f <path>\n",
             file=sys.stderr,
         )
+        sys.exit(1)
+
+    try:
+        warnings = validate_config(config, services)
+        for w in warnings:
+            print(f"muster: warning: {w}", file=sys.stderr)
+    except ConfigError as exc:
+        print(f"muster: config error: {exc}", file=sys.stderr)
         sys.exit(1)
 
     # Auto-resolve ports if port_discovery is enabled in the config.
