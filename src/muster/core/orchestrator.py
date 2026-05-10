@@ -11,6 +11,7 @@ import asyncio
 import os
 import signal
 import socket
+from collections import deque
 from datetime import datetime
 from pathlib import Path
 from collections.abc import Callable
@@ -18,6 +19,22 @@ from collections.abc import Callable
 from ..models import MusterConfig, Service, Status
 from .process import kill_port_owner
 from .resolver import resolve_dependencies, resolve_port
+
+_LOG_RETENTION_DAYS = 7
+
+
+def _logfile_path(svc_name: str, now: datetime | None = None) -> Path:
+    today = (now or datetime.now()).strftime("%Y-%m-%d")
+    return Path("muster_logs") / svc_name / f"{today}.log"
+
+
+def _cleanup_old_logs(svc_name: str) -> None:
+    """Remove log files older than ``_LOG_RETENTION_DAYS`` for a service."""
+    log_dir = Path("muster_logs") / svc_name
+    cutoff = datetime.now().timestamp() - _LOG_RETENTION_DAYS * 86400
+    for f in log_dir.glob("*.log"):
+        if f.stat().st_mtime < cutoff:
+            f.unlink()
 
 
 class ServiceOrchestrator:
@@ -186,19 +203,28 @@ class ServiceOrchestrator:
             self._set_status(svc, Status.STARTING)
             self._notify(f"Starting {svc.name}...", "information")
 
+            now = datetime.now()
             cmd = svc.cmd_for(mode)
             if not cmd:
                 raise RuntimeError("no command available for mode")
             # Unset GOROOT to avoid conflicts with local Go toolchains.
             cmd = f"unset GOROOT && {cmd}"
 
-            logfile = Path("logs") / f"{svc.name}.log"
-            logfile.parent.mkdir(exist_ok=True)
+            logfile = _logfile_path(svc.name, now)
+            logfile.parent.mkdir(parents=True, exist_ok=True)
+            _cleanup_old_logs(svc.name)
 
-            svc.log_lines = [
-                f"muster▸Command: {cmd}",
-                "muster▸Compiling (first start may take a few seconds)...",
-            ]
+            # Write restart separator to on-disk log.
+            with open(logfile, "a", encoding="utf-8") as f:
+                f.write(f"\n=== muster restart {now.isoformat()} ===\n\n")
+
+            svc.log_lines.clear()
+            svc.log_lines.extend(
+                [
+                    f"muster▸Command: {cmd}",
+                    "muster▸Compiling (first start may take a few seconds)...",
+                ]
+            )
             for line in svc.log_lines:
                 self._log(svc.name, line)
 
@@ -211,7 +237,7 @@ class ServiceOrchestrator:
                 executable=shell,
             )
             svc.proc = proc
-            svc.start_time = datetime.now()
+            svc.start_time = now
             pid_msg = f"muster▸Process PID: {proc.pid}"
             svc.log_lines.append(pid_msg)
             self._log(svc.name, pid_msg)
@@ -346,8 +372,8 @@ class ServiceOrchestrator:
     ) -> None:
         """Stream subprocess stdout to the in-memory ring buffer and disk log.
 
-        Maintains a rolling window of the last 2000 lines in ``svc.log_lines``
-        to prevent unbounded memory growth for long-running services.
+        ``svc.log_lines`` is a ``deque`` with ``maxlen=2000`` so old lines are
+        evicted automatically in O(1) time.
 
         Args:
             svc: Service owning the process.
@@ -355,17 +381,19 @@ class ServiceOrchestrator:
             logfile: Path to the on-disk log file.
         """
         try:
-            with open(logfile, "w", encoding="utf-8") as f:
+            with open(logfile, "a", encoding="utf-8") as f:
                 while True:
                     line = await proc.stdout.readline()
                     if not line:
                         break
                     text = line.decode("utf-8", errors="replace").rstrip()
                     if text:
+                        # Intentionally omitting flush: per-line flush is a
+                        # hot-path bottleneck for high-volume logs.  Data is
+                        # safe when the child exits (with-block closes the
+                        # file) but up to ~8KB may be lost if muster itself
+                        # crashes before the OS buffer is synced.
                         f.write(text + "\n")
-                        f.flush()
-                        if len(svc.log_lines) >= 2000:
-                            svc.log_lines = svc.log_lines[-1999:]
                         svc.log_lines.append(text)
                         self._log(svc.name, text)
         except asyncio.CancelledError:

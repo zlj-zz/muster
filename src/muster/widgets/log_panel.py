@@ -193,7 +193,11 @@ class LogPanel(Vertical):
             line = f"{datetime.now().strftime('%H:%M:%S')} {line}"
         was_full = len(self._buffer) == self._buffer.maxlen
         self._buffer.append(line)
-        if was_full:
+        if was_full and self._log_level == "ALL":
+            self._displayed_lines.pop(0)
+            self._displayed_lines.append(line)
+            self._sync_text_area()
+        elif was_full:
             self._rebuild_display()
         elif self._is_visible(line):
             self._displayed_lines.append(line)

@@ -64,9 +64,7 @@ def _validate_cmds(services: list[Service]) -> None:
     for svc in services:
         if isinstance(svc.cmd, dict):
             if not svc.cmd:
-                raise ConfigError(
-                    f"service {svc.name!r}: cmd dict must not be empty"
-                )
+                raise ConfigError(f"service {svc.name!r}: cmd dict must not be empty")
             for mode, cmd in svc.cmd.items():
                 if not cmd or not cmd.strip():
                     raise ConfigError(

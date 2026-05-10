@@ -55,12 +55,8 @@ class TestValidateConfig:
 
     def test_circular_dependency(self, sample_config):
         services = [
-            Service(
-                name="a", cmd="a", group="backend", depends_on=["b"]
-            ),
-            Service(
-                name="b", cmd="b", group="backend", depends_on=["a"]
-            ),
+            Service(name="a", cmd="a", group="backend", depends_on=["b"]),
+            Service(name="b", cmd="b", group="backend", depends_on=["a"]),
         ]
         with pytest.raises(ConfigError, match="circular dependency"):
             validate_config(sample_config, services)

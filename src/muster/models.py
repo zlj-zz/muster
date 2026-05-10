@@ -7,6 +7,7 @@ including service definitions, configuration structures, and runtime state.
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -121,7 +122,7 @@ class Service:
     # runtime state
     status: Status = Status.STOPPED
     proc: asyncio.subprocess.Process | None = None
-    log_lines: list[str] = field(default_factory=list)
+    log_lines: deque[str] = field(default_factory=lambda: deque(maxlen=2000))
     start_time: datetime | None = None
     restart_count: int = 0
     last_error: str | None = None

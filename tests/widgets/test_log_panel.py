@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import deque
+
 from muster.models import Service
 from muster.widgets.log_panel import LogPanel
 from tests.conftest import WidgetTestApp
@@ -15,7 +17,7 @@ class TestLogPanelSetService:
         async with app.run_test() as pilot:
             panel = app.query_one(LogPanel)
             svc = Service(name="api", cmd="go run api.go", group="backend")
-            svc.log_lines = ["line 1", "line 2", "ERROR broken"]
+            svc.log_lines = deque(["line 1", "line 2", "ERROR broken"])
             panel.set_service(svc)
             assert panel._svc_name == "api"
             assert panel.border_title == "Logs: api"
@@ -29,7 +31,7 @@ class TestLogPanelSetService:
         async with app.run_test() as pilot:
             panel = app.query_one(LogPanel)
             svc = Service(name="api", cmd="go run api.go", group="backend")
-            svc.log_lines = ["hello"]
+            svc.log_lines = deque(["hello"])
             panel.set_service(svc)
             panel.set_service(None)
             assert panel._svc_name is None
@@ -69,7 +71,7 @@ class TestLogPanelLevelFilter:
         async with app.run_test() as pilot:
             panel = app.query_one(LogPanel)
             svc = Service(name="api", cmd="go run api.go", group="backend")
-            svc.log_lines = ["INFO hello", "ERROR broken", "INFO world"]
+            svc.log_lines = deque(["INFO hello", "ERROR broken", "INFO world"])
             panel.set_service(svc)
 
             panel._set_level("ERROR")
@@ -83,7 +85,7 @@ class TestLogPanelLevelFilter:
         async with app.run_test() as pilot:
             panel = app.query_one(LogPanel)
             svc = Service(name="api", cmd="go run api.go", group="backend")
-            svc.log_lines = ["INFO hello", "WARN caution", "ERROR broken"]
+            svc.log_lines = deque(["INFO hello", "WARN caution", "ERROR broken"])
             panel.set_service(svc)
 
             panel._set_level("WARN")
@@ -97,7 +99,7 @@ class TestLogPanelLevelFilter:
         async with app.run_test() as pilot:
             panel = app.query_one(LogPanel)
             svc = Service(name="api", cmd="go run api.go", group="backend")
-            svc.log_lines = ["INFO hello", "ERROR broken"]
+            svc.log_lines = deque(["INFO hello", "ERROR broken"])
             panel.set_service(svc)
 
             panel._set_level("ALL")
@@ -114,7 +116,7 @@ class TestLogPanelSearch:
         async with app.run_test() as pilot:
             panel = app.query_one(LogPanel)
             svc = Service(name="api", cmd="go run api.go", group="backend")
-            svc.log_lines = ["foo bar", "baz qux", "foo qux"]
+            svc.log_lines = deque(["foo bar", "baz qux", "foo qux"])
             panel.set_service(svc)
 
             panel._search_input.value = "foo"
@@ -128,7 +130,7 @@ class TestLogPanelSearch:
         async with app.run_test() as pilot:
             panel = app.query_one(LogPanel)
             svc = Service(name="api", cmd="go run api.go", group="backend")
-            svc.log_lines = ["hello world"]
+            svc.log_lines = deque(["hello world"])
             panel.set_service(svc)
 
             panel._do_search("xyz")
@@ -140,7 +142,7 @@ class TestLogPanelSearch:
         async with app.run_test() as pilot:
             panel = app.query_one(LogPanel)
             svc = Service(name="api", cmd="go run api.go", group="backend")
-            svc.log_lines = ["foo", "bar", "foo"]
+            svc.log_lines = deque(["foo", "bar", "foo"])
             panel.set_service(svc)
 
             panel._search_input.value = "foo"
@@ -156,7 +158,7 @@ class TestLogPanelSearch:
         async with app.run_test() as pilot:
             panel = app.query_one(LogPanel)
             svc = Service(name="api", cmd="go run api.go", group="backend")
-            svc.log_lines = ["foo", "bar", "foo"]
+            svc.log_lines = deque(["foo", "bar", "foo"])
             panel.set_service(svc)
 
             panel._search_input.value = "foo"
