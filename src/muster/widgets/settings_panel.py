@@ -88,6 +88,16 @@ class SettingsPanel(VerticalScroll):
 
             with Horizontal(classes="settings-row"):
                 yield SettingsLabel(
+                    "Wrap lines",
+                    "Soft-wrap long log lines instead of truncating",
+                )
+                yield Switch(
+                    value=self.settings.log_wrap,
+                    id="switch-wrap",
+                )
+
+            with Horizontal(classes="settings-row"):
+                yield SettingsLabel(
                     "Default level",
                     "Initial log-level filter shown in the log panel",
                 )
@@ -188,6 +198,7 @@ class SettingsPanel(VerticalScroll):
                 log_show_timestamp=bool(
                     self.query_one("#switch-timestamps", Switch).value
                 ),
+                log_wrap=bool(self.query_one("#switch-wrap", Switch).value),
                 log_default_level=str(
                     self.query_one("#select-log-level", Select).value
                 ),
@@ -223,6 +234,7 @@ class SettingsPanel(VerticalScroll):
         )
         self.query_one("#switch-auto-scroll", Switch).value = defaults.log_auto_scroll
         self.query_one("#switch-timestamps", Switch).value = defaults.log_show_timestamp
+        self.query_one("#switch-wrap", Switch).value = defaults.log_wrap
         self.query_one("#select-log-level", Select).value = defaults.log_default_level
         self.query_one("#input-buffer-lines", Input).value = str(
             defaults.log_buffer_lines

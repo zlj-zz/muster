@@ -205,6 +205,7 @@ class AppSettings:
     port_conflict_strategy: str = "kill"
     log_auto_scroll: bool = True
     log_show_timestamp: bool = False
+    log_wrap: bool = True
     log_default_level: str = "ALL"
     log_buffer_lines: int = 2000
     load_history_on_startup: bool = False

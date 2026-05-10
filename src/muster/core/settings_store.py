@@ -71,24 +71,23 @@ def apply_to_app(app, settings: AppSettings) -> None:
     app._orchestrator.health_timeout = settings.health_timeout
     app._orchestrator.port_conflict_strategy = settings.port_conflict_strategy
 
-    # Update log panel (attributes may not exist until Task #44)
+    # Update log panel
+    from textual.css.query import NoMatches
     from ..widgets.log_panel import LogPanel
 
     try:
         log_panel = app.query_one("#log", LogPanel)
-    except Exception:
+    except NoMatches:
         log_panel = None
 
     if log_panel is not None:
         log_panel.auto_scroll = settings.log_auto_scroll
         log_panel.show_timestamp = settings.log_show_timestamp
+        log_panel.wrap = settings.log_wrap
         log_panel.buffer_lines = settings.log_buffer_lines
         log_panel.load_history = settings.load_history_on_startup
-        if log_panel._buffer.maxlen != settings.log_buffer_lines:
-            old = list(log_panel._buffer)
-            from collections import deque
-
-            log_panel._buffer = deque(old, maxlen=settings.log_buffer_lines)
+        log_panel.set_wrap(settings.log_wrap)
+        log_panel.resize_buffer(settings.log_buffer_lines)
         if log_panel._log_level == "ALL":
             log_panel._set_level(settings.log_default_level)
 

@@ -347,19 +347,6 @@ Tree > .tree--highlight {
     background: transparent;
 }
 
-LogLine {
-    height: auto;
-    padding: 0 1;
-}
-
-LogLine.active {
-    background: #636772;
-}
-
-LogLine:hover {
-    background: #2c313c;
-}
-
 /* ========== Env Detail Panel ========== */
 #env-detail {
     height: 1fr;
@@ -402,7 +389,7 @@ LogLine:hover {
 /* ========== Scrollbar ========== */
 /* Textual uses `scrollbar-color` and `scrollbar-background` properties
    on the PARENT container (Tree, TextArea, etc.), not on ScrollBar itself. */
-Tree, TextArea, VerticalScroll, DataTable {
+Tree, TextArea, VerticalScroll, DataTable, RichLog {
     scrollbar-color: #7a8295;
     scrollbar-background: transparent;
     scrollbar-color-hover: #abb2bf;

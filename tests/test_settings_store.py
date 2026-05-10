@@ -14,6 +14,8 @@ from muster.core.settings_store import (
     load_settings,
     save_settings,
 )
+from textual.css.query import NoMatches
+
 from muster.models import AppSettings
 
 
@@ -81,7 +83,7 @@ class TestApplyToApp:
     def test_applies_orchestrator_params(self):
         app = MagicMock()
         app._orchestrator = MagicMock()
-        app.query_one.side_effect = Exception("no log panel")
+        app.query_one.side_effect = NoMatches("no log panel")
 
         settings = AppSettings(
             stop_timeout=12.0,
@@ -97,7 +99,7 @@ class TestApplyToApp:
     def test_restarts_env_timer_on_interval_change(self):
         app = MagicMock()
         app._orchestrator = MagicMock()
-        app.query_one.side_effect = Exception("no log panel")
+        app.query_one.side_effect = NoMatches("no log panel")
         app._env_refresh_interval = 5
         old_timer = MagicMock()
         app._env_timer = old_timer
@@ -112,7 +114,7 @@ class TestApplyToApp:
     def test_no_timer_restart_when_interval_unchanged(self):
         app = MagicMock()
         app._orchestrator = MagicMock()
-        app.query_one.side_effect = Exception("no log panel")
+        app.query_one.side_effect = NoMatches("no log panel")
         app._env_refresh_interval = 5
         app._env_timer = MagicMock()
 
