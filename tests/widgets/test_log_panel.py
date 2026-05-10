@@ -5,8 +5,17 @@ from __future__ import annotations
 from collections import deque
 
 from muster.models import Service
-from muster.widgets.log_panel import LogPanel
+from muster.widgets.log_panel import LogLine, LogPanel
 from tests.conftest import WidgetTestApp
+
+
+def _displayed_text(panel: LogPanel) -> str:
+    """Return all currently displayed log lines joined by newlines."""
+    return "\n".join(
+        child.raw_text
+        for child in panel._log_list.children
+        if isinstance(child, LogLine)
+    )
 
 
 class TestLogPanelSetService:
@@ -22,7 +31,7 @@ class TestLogPanelSetService:
             assert panel._svc_name == "api"
             assert panel.border_title == "Logs: api"
             assert len(panel._buffer) == 3
-            text = panel._text_area.text
+            text = _displayed_text(panel)
             assert "line 1" in text
             assert "ERROR broken" in text
 
@@ -34,9 +43,10 @@ class TestLogPanelSetService:
             svc.log_lines = deque(["hello"])
             panel.set_service(svc)
             panel.set_service(None)
+            await pilot.pause()
             assert panel._svc_name is None
             assert panel.border_title == "Logs"
-            assert panel._text_area.text == ""
+            assert _displayed_text(panel) == ""
 
 
 class TestLogPanelAppend:
@@ -49,7 +59,7 @@ class TestLogPanelAppend:
             svc = Service(name="api", cmd="go run api.go", group="backend")
             panel.set_service(svc)
             panel.append_log("api", "new line")
-            assert "new line" in panel._text_area.text
+            assert "new line" in _displayed_text(panel)
             assert len(panel._buffer) == 1
 
     async def test_append_hidden_service_ignored(self):
@@ -59,7 +69,7 @@ class TestLogPanelAppend:
             svc = Service(name="api", cmd="go run api.go", group="backend")
             panel.set_service(svc)
             panel.append_log("other", "should not appear")
-            assert "should not appear" not in panel._text_area.text
+            assert "should not appear" not in _displayed_text(panel)
             assert len(panel._buffer) == 0
 
 
@@ -75,7 +85,8 @@ class TestLogPanelLevelFilter:
             panel.set_service(svc)
 
             panel._set_level("ERROR")
-            text = panel._text_area.text
+            await pilot.pause()
+            text = _displayed_text(panel)
             assert "ERROR broken" in text
             assert "INFO hello" not in text
             assert "INFO world" not in text
@@ -89,7 +100,8 @@ class TestLogPanelLevelFilter:
             panel.set_service(svc)
 
             panel._set_level("WARN")
-            text = panel._text_area.text
+            await pilot.pause()
+            text = _displayed_text(panel)
             assert "WARN caution" in text
             assert "INFO hello" not in text
             assert "ERROR broken" not in text
@@ -103,7 +115,8 @@ class TestLogPanelLevelFilter:
             panel.set_service(svc)
 
             panel._set_level("ALL")
-            text = panel._text_area.text
+            await pilot.pause()
+            text = _displayed_text(panel)
             assert "INFO hello" in text
             assert "ERROR broken" in text
 
@@ -116,7 +129,8 @@ class TestLogPanelLevelFilter:
             panel.set_service(svc)
 
             panel._set_level("DEBUG")
-            text = panel._text_area.text
+            await pilot.pause()
+            text = _displayed_text(panel)
             assert "DEBUG details" in text
             assert "INFO hello" not in text
             assert "ERROR broken" not in text
@@ -198,8 +212,8 @@ class TestLogPanelHistoricalLoad:
             panel.load_history = True
             svc = Service(name="api", cmd="go run api.go", group="backend")
             panel.set_service(svc)
-            assert "historical line 1" in panel._text_area.text
-            assert "historical line 2" in panel._text_area.text
+            assert "historical line 1" in _displayed_text(panel)
+            assert "historical line 2" in _displayed_text(panel)
             assert len(panel._buffer) == 2
 
     async def test_skips_disk_when_disabled(self, tmp_path, monkeypatch):
@@ -216,7 +230,7 @@ class TestLogPanelHistoricalLoad:
             panel.load_history = False
             svc = Service(name="api", cmd="go run api.go", group="backend")
             panel.set_service(svc)
-            assert panel._text_area.text == ""
+            assert _displayed_text(panel) == ""
             assert len(panel._buffer) == 0
 
     async def test_skips_disk_when_already_loaded(self, tmp_path, monkeypatch):
@@ -234,5 +248,5 @@ class TestLogPanelHistoricalLoad:
             svc = Service(name="api", cmd="go run api.go", group="backend")
             svc.log_lines.append("live line")
             panel.set_service(svc)
-            assert "live line" in panel._text_area.text
-            assert "disk line" not in panel._text_area.text
+            assert "live line" in _displayed_text(panel)
+            assert "disk line" not in _displayed_text(panel)

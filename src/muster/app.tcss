@@ -294,22 +294,23 @@ Tree > .tree--highlight {
     content-align: center middle;
 }
 
-#log-text {
+#log-scroll {
     height: 1fr;
-}
-
-TextArea {
+    border: none;
     background: transparent;
-    border: none;
 }
 
-TextArea:focus {
-    border: none;
+LogLine {
+    height: auto;
+    padding: 0 1;
 }
 
-#log-text .text-area--selection {
-    background: #eab459;
-    color: #1e2227;
+LogLine.active {
+    background: #636772;
+}
+
+LogLine:hover {
+    background: #2c313c;
 }
 
 /* ========== Env Detail Panel ========== */

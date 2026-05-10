@@ -6,7 +6,7 @@ from .env_detail_panel import EnvDetailPanel
 from .env_indicator import EnvIndicator
 from .env_list import EnvList
 from .file_list import FileList
-from .log_panel import LogPanel
+from .log_panel import LogLine, LogList, LogPanel
 from .service_tree import ServiceTree
 from .settings_panel import SettingsPanel
 from .status_bar import StatusBar
@@ -20,6 +20,8 @@ __all__ = [
     "EnvIndicator",
     "EnvList",
     "FileList",
+    "LogLine",
+    "LogList",
     "LogPanel",
     "ServiceTree",
     "SettingsPanel",
