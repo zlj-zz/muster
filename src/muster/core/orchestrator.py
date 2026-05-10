@@ -22,6 +22,14 @@ from .resolver import resolve_dependencies, resolve_port
 
 _LOG_RETENTION_DAYS = 7
 
+#: Valid status transitions.  stop() may force any transition.
+_VALID_TRANSITIONS: dict[Status, set[Status]] = {
+    Status.STOPPED: {Status.STARTING},
+    Status.STARTING: {Status.RUNNING, Status.FAILED},
+    Status.RUNNING: {Status.STOPPED, Status.FAILED},
+    Status.FAILED: {Status.STARTING, Status.STOPPED},
+}
+
 
 def _logfile_path(svc_name: str, now: datetime | None = None) -> Path:
     today = (now or datetime.now()).strftime("%Y-%m-%d")
@@ -96,6 +104,8 @@ class ServiceOrchestrator:
         self.port_conflict_strategy: str = "kill"
         self._reader_tasks: dict[str, asyncio.Task] = {}
         self._health_tasks: dict[str, asyncio.Task] = {}
+        self._monitor_tasks: dict[str, asyncio.Task] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
 
     # ---------- internal helpers ----------
 
@@ -103,8 +113,23 @@ class ServiceOrchestrator:
         """Forward a log line to the UI callback."""
         self._on_log(svc_name, line)
 
-    def _set_status(self, svc: Service, status: Status) -> None:
-        """Update a service's status and notify the UI."""
+    def _get_lock(self, svc_name: str) -> asyncio.Lock:
+        """Return the asyncio.Lock for *svc_name*, creating one if necessary."""
+        return self._locks.setdefault(svc_name, asyncio.Lock())
+
+    def _set_status(
+        self, svc: Service, status: Status, *, force: bool = False
+    ) -> None:
+        """Update a service's status and notify the UI.
+
+        Guards against illegal transitions unless *force* is ``True``.
+        """
+        if status == svc.status:
+            return
+        if not force:
+            valid_next = _VALID_TRANSITIONS.get(svc.status, set())
+            if status not in valid_next:
+                return
         svc.status = status
         self._on_status(svc)
 
@@ -222,12 +247,13 @@ class ServiceOrchestrator:
             svc: Service to start.
             mode: Command mode key passed to ``svc.cmd_for()``.
         """
-        if svc.status in (Status.STARTING, Status.RUNNING):
-            return
+        async with self._get_lock(svc.name):
+            if svc.status in (Status.STARTING, Status.RUNNING):
+                return
+            self._set_status(svc, Status.STARTING)
+        self._notify(f"Starting {svc.name}...", "information")
 
         try:
-            self._set_status(svc, Status.STARTING)
-            self._notify(f"Starting {svc.name}...", "information")
 
             now = datetime.now()
             cmd = svc.cmd_for(mode)
@@ -272,13 +298,16 @@ class ServiceOrchestrator:
                 self._read_output(svc, proc, logfile)
             )
             self._health_tasks[svc.name] = asyncio.create_task(self._wait_process(svc))
-            asyncio.create_task(self._health_check(svc))
+            self._monitor_tasks[svc.name] = asyncio.create_task(self._health_check(svc))
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             err_msg = f"!!! Start error: {e}"
             svc.log_lines.append(err_msg)
             svc.last_error = str(e)
             self._log(svc.name, err_msg)
-            self._set_status(svc, Status.FAILED)
+            async with self._get_lock(svc.name):
+                self._set_status(svc, Status.FAILED)
             self._notify(f"Start {svc.name} failed: {e}", "error")
 
     async def stop(self, svc: Service) -> None:
@@ -290,14 +319,15 @@ class ServiceOrchestrator:
         Args:
             svc: Service to stop.
         """
-        if svc.status == Status.STOPPED:
-            return
+        async with self._get_lock(svc.name):
+            if svc.status == Status.STOPPED:
+                return
 
         stop_msg = "muster▸Stopping service..."
         svc.log_lines.append(stop_msg)
         self._log(svc.name, stop_msg)
 
-        for task_dict in (self._reader_tasks, self._health_tasks):
+        for task_dict in (self._reader_tasks, self._health_tasks, self._monitor_tasks):
             task = task_dict.pop(svc.name, None)
             if task:
                 task.cancel()
@@ -322,7 +352,8 @@ class ServiceOrchestrator:
 
         svc.proc = None
         svc.start_time = None
-        self._set_status(svc, Status.STOPPED)
+        async with self._get_lock(svc.name):
+            self._set_status(svc, Status.STOPPED, force=True)
         stopped_msg = "muster▸Service stopped"
         svc.log_lines.append(stopped_msg)
         self._log(svc.name, stopped_msg)
@@ -375,21 +406,27 @@ class ServiceOrchestrator:
         await self.start_with_deps(svc, mode)
 
     async def stop_all(self, services: list[Service]) -> None:
-        """Stop all given services.
+        """Stop all given services in parallel.
 
         Args:
             services: Iterable of services to stop.
         """
-        for svc in services:
-            if svc.status != Status.STOPPED:
-                await self.stop(svc)
+        await asyncio.gather(
+            *[self.stop(svc) for svc in services if svc.status != Status.STOPPED],
+            return_exceptions=True,
+        )
 
     async def cleanup(self) -> None:
-        """Cancel all background tasks (log readers, health checks, etc.)."""
-        for task in list(self._reader_tasks.values()) + list(
-            self._health_tasks.values()
-        ):
+        """Cancel and await all background tasks (log readers, health checks, etc.)."""
+        tasks = (
+            list(self._reader_tasks.values())
+            + list(self._health_tasks.values())
+            + list(self._monitor_tasks.values())
+        )
+        for task in tasks:
             task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     # ---------- background tasks ----------
 
@@ -445,7 +482,8 @@ class ServiceOrchestrator:
 
             if returncode != 0 and svc.status != Status.STOPPED:
                 svc.last_error = f"exit code {returncode}"
-                self._set_status(svc, Status.FAILED)
+                async with self._get_lock(svc.name):
+                    self._set_status(svc, Status.FAILED)
                 self._notify(
                     f"{svc.name} process exited abnormally (code={returncode})", "error"
                 )
@@ -472,26 +510,29 @@ class ServiceOrchestrator:
         Args:
             svc: Service to health-check.
         """
-        import socket
-
         try:
             port = svc.port or resolve_port(svc.name, self.config.port_discovery)
             if port is None:
                 await asyncio.sleep(3)
-                if svc.proc and svc.proc.returncode is None:
-                    self._set_status(svc, Status.RUNNING)
-                else:
-                    self._set_status(svc, Status.FAILED)
+                async with self._get_lock(svc.name):
+                    if svc.proc and svc.proc.returncode is None:
+                        self._set_status(svc, Status.RUNNING)
+                    else:
+                        self._set_status(svc, Status.FAILED)
                 return
 
             for i in range(self.health_timeout):
-                if svc.proc is None or svc.proc.returncode is not None:
-                    self._set_status(svc, Status.FAILED)
+                async with self._get_lock(svc.name):
+                    if svc.proc is None or svc.proc.returncode is not None:
+                        self._set_status(svc, Status.FAILED)
+                # Lock released — check whether we already set FAILED.
+                if svc.status == Status.FAILED:
                     self._log(svc.name, "muster▸Process exited, health check failed")
                     return
                 try:
                     with socket.create_connection(("127.0.0.1", port), timeout=1.0):
-                        self._set_status(svc, Status.RUNNING)
+                        async with self._get_lock(svc.name):
+                            self._set_status(svc, Status.RUNNING)
                         svc.port = port
                         self._log(svc.name, f"muster▸Service ready (port {port})")
                         self._notify(f"{svc.name} ready (:{port})", "success")
@@ -504,12 +545,14 @@ class ServiceOrchestrator:
                     )
                 await asyncio.sleep(1)
 
-            self._set_status(svc, Status.FAILED)
+            async with self._get_lock(svc.name):
+                self._set_status(svc, Status.FAILED)
             self._log(svc.name, f"muster▸Port {port} not ready, health check timeout")
             self._notify(f"{svc.name} port {port} not ready", "error")
         except Exception as e:
             err = f"!!! Health check error: {e}"
             svc.log_lines.append(err)
             self._log(svc.name, err)
-            self._set_status(svc, Status.FAILED)
+            async with self._get_lock(svc.name):
+                self._set_status(svc, Status.FAILED)
             self._notify(f"{svc.name} health check error: {e}", "error")

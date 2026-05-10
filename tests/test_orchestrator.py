@@ -84,12 +84,19 @@ class TestOrchestratorStop:
 
         registry = {"api": svc}
         orch = _make_orchestrator(registry)
-        orch._health_tasks["api"] = MagicMock()
-        orch._reader_tasks["api"] = MagicMock()
+        health_mock = MagicMock()
+        reader_mock = MagicMock()
+        monitor_mock = MagicMock()
+        orch._health_tasks["api"] = health_mock
+        orch._reader_tasks["api"] = reader_mock
+        orch._monitor_tasks["api"] = monitor_mock
 
         await orch.stop(svc)
         assert svc.status == Status.STOPPED
         mock_killpg.assert_called_once_with(100, signal.SIGTERM)
+        health_mock.cancel.assert_called_once()
+        reader_mock.cancel.assert_called_once()
+        monitor_mock.cancel.assert_called_once()
 
     async def test_already_stopped_skips(self):
         svc = Service(name="api", cmd="echo hello", group="backend")

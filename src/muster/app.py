@@ -229,10 +229,12 @@ class MusterApp(App):
             svc_name: Name of the service that produced the line.
             line: Raw log text.
         """
+        from textual.css.query import NoMatches
+
         try:
             self.query_one("#log", LogPanel).append_log(svc_name, line)
-        except Exception as e:
-            self.log.error(f"append_log failed: {e}")
+        except NoMatches:
+            pass
 
     def _filtered_services(self) -> list[Service]:
         """Return services matching the current group filter.
@@ -309,7 +311,7 @@ class MusterApp(App):
 
         try:
             results = check_env(self._muster_config.env_checks)
-        except OSError as e:
+        except (OSError, RuntimeError, AttributeError) as e:
             self.log.error(f"env check failed: {e}")
             return
 
@@ -331,14 +333,16 @@ class MusterApp(App):
         Args:
             svc: Service whose visual representation should be refreshed.
         """
+        from textual.css.query import NoMatches
+
         try:
             tree = self.query_one("#service-tree", ServiceTree)
             tree.refresh_node(svc)
             detail = self.query_one("#detail", DetailPanel)
             if detail.current_service is svc:
                 detail.refresh_content()
-        except Exception as exc:
-            self.log.error(f"refresh_list_item failed: {exc}")
+        except (NoMatches, AttributeError):
+            pass
 
     # ---------- event handlers ----------
 
