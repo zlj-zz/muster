@@ -143,7 +143,7 @@ class TestDetailPanelMessages:
 class TestDetailPanelResources:
     """Resource card display."""
 
-    async def test_resources_show_dashes_when_stopped(self, detail_panel):
+    async def test_resources_show_zero_bar_when_stopped(self, detail_panel):
         app = WidgetTestApp(detail_panel)
         async with app.run_test() as pilot:
             panel = app.query_one(DetailPanel)
@@ -152,8 +152,9 @@ class TestDetailPanelResources:
 
             cpu = panel.query_one("#res-cpu", Static)
             mem = panel.query_one("#res-mem", Static)
-            assert cpu.content == "—"
-            assert mem.content == "—"
+            assert "0.0%" in cpu.content.plain
+            assert "0.0%" in mem.content.plain
+            assert "#5c6370" in str(cpu.content.spans)
 
     async def test_resources_render_values(self, detail_panel):
         app = WidgetTestApp(detail_panel)

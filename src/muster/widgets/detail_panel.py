@@ -236,19 +236,21 @@ class DetailPanel(Static):
         self._last_mem = mem
 
         if cpu is None or mem is None:
-            self._cached_cpu_widget.update("—")
-            self._cached_mem_widget.update("—")
+            stopped_color = self._status_colors.get("stopped", "#5c6370")
+            self._cached_cpu_widget.update(self._resource_text(0.0, stopped_color))
+            self._cached_mem_widget.update(self._resource_text(0.0, stopped_color))
             return
 
         self._cached_cpu_widget.update(self._resource_text(cpu))
         self._cached_mem_widget.update(self._resource_text(mem))
 
     @staticmethod
-    def _resource_text(percent: float) -> Text:
+    def _resource_text(percent: float, color: str | None = None) -> Text:
         """Build a coloured progress-bar Text for a resource metric.
 
         Args:
             percent: Percentage value (0-100+).
+            color: Override colour; if ``None``, picked by threshold.
 
         Returns:
             A ``RichText`` with a block-char bar and percentage.
@@ -258,12 +260,13 @@ class DetailPanel(Static):
         filled = min(filled, width)
         bar = "█" * filled + "░" * (width - filled)
 
-        if percent >= 95:
-            color = "#e06c75"
-        elif percent >= 80:
-            color = "#e5c07b"
-        else:
-            color = "#98c379"
+        if color is None:
+            if percent >= 95:
+                color = "#e06c75"
+            elif percent >= 80:
+                color = "#e5c07b"
+            else:
+                color = "#98c379"
 
         return Text.assemble(
             (f"[{bar}] ", color),

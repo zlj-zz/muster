@@ -210,7 +210,7 @@ Tree > .tree--highlight {
     height: auto;
     color: #abb2bf;
     text-style: bold;
-    margin-bottom: 0;
+    margin-bottom: 1;
 }
 
 .detail-code {
