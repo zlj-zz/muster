@@ -361,6 +361,25 @@ Tree > .tree--highlight {
     overflow-y: auto;
 }
 
+#env-detail-meta {
+    height: auto;
+}
+
+#env-detail-history {
+    height: auto;
+    margin-top: 1;
+}
+
+#env-detail-latency-stats {
+    height: auto;
+    margin-top: 1;
+}
+
+#env-detail-stats {
+    height: auto;
+    margin-top: 1;
+}
+
 /* ========== YAML Preview ========== */
 #yaml-preview {
     height: 1fr;

@@ -156,6 +156,8 @@ def _check_one(ec: EnvCheck) -> tuple[str, bool]:
 
     ec.last_checked = datetime.now()
     ec.latency_ms = latency
+    ec.history.append(ok)
+    ec.latency_history.append(latency)
     if ok:
         ec.consecutive_failures = 0
     else:

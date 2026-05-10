@@ -70,6 +70,10 @@ class EnvCheck:
     last_checked: datetime | None = None
     latency_ms: int | None = None
     consecutive_failures: int = 0
+    history: deque[bool] = field(default_factory=lambda: deque(maxlen=30))
+    latency_history: deque[int | None] = field(
+        default_factory=lambda: deque(maxlen=720)
+    )
 
 
 @dataclass
