@@ -8,6 +8,7 @@ from .env_list import EnvList
 from .file_list import FileList
 from .log_panel import LogPanel
 from .service_tree import ServiceTree
+from .settings_panel import SettingsPanel
 from .status_bar import StatusBar
 from .yaml_preview import YamlPreview
 
@@ -21,6 +22,7 @@ __all__ = [
     "FileList",
     "LogPanel",
     "ServiceTree",
+    "SettingsPanel",
     "StatusBar",
     "YamlPreview",
 ]

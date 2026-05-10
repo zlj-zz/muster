@@ -176,3 +176,35 @@ class MusterConfig:
             "failed": "#e06c75",
         }
     )
+
+
+@dataclass
+class AppSettings:
+    """User-level runtime preferences persisted across sessions.
+
+    These settings control behaviour, timeouts, and display preferences.
+    They are independent of project-level configuration in
+    ``muster-compose.yaml``.
+
+    Attributes:
+        env_refresh_interval: Seconds between environment check polls.
+        port_conflict_strategy: How to handle a port already in use
+            (``"kill"``, ``"warn"``, ``"abort"``).
+        log_auto_scroll: Whether the log panel should scroll to the bottom
+            on every new line.
+        log_show_timestamp: Whether to prefix each log line with a timestamp.
+        log_default_level: Default log-level filter (``"ALL"``, ``"ERROR"``,
+            ``"WARN"``, ``"INFO"``).
+        log_buffer_lines: Maximum number of log lines to keep in memory.
+        health_timeout: Seconds to wait for a service port to become ready.
+        stop_timeout: Seconds to wait for graceful shutdown before SIGKILL.
+    """
+
+    env_refresh_interval: int = 5
+    port_conflict_strategy: str = "kill"
+    log_auto_scroll: bool = True
+    log_show_timestamp: bool = False
+    log_default_level: str = "ALL"
+    log_buffer_lines: int = 2000
+    health_timeout: int = 60
+    stop_timeout: float = 8.0

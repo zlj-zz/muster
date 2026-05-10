@@ -18,6 +18,7 @@ from textual.widgets import ContentSwitcher, Static
 
 from .core.env import check_env
 from .core.orchestrator import ServiceOrchestrator
+from .core.settings_store import apply_to_app, load_settings
 from .models import Group, MusterConfig, Service, Status
 from .widgets import (
     ActivityBar,
@@ -29,6 +30,7 @@ from .widgets import (
     FileList,
     LogPanel,
     ServiceTree,
+    SettingsPanel,
     YamlPreview,
 )
 
@@ -61,6 +63,7 @@ class MusterApp(App):
         Binding("1", "switch_tab('svc')", "Svc", show=False),
         Binding("2", "switch_tab('env')", "Env", show=False),
         Binding("3", "switch_tab('yaml')", "Yaml", show=False),
+        Binding("4", "switch_tab('settings')", "Settings", show=False),
         Binding("j,down", "cursor_down", "Down", show=False),
         Binding("k,up", "cursor_up", "Up", show=False),
     ]
@@ -89,6 +92,8 @@ class MusterApp(App):
             on_status=self._refresh_list_item,
             on_notify=lambda msg, sev: self.notify(msg, severity=sev),
         )
+        self._settings = load_settings()
+        self._env_timer = None
         self._yaml_files = self._scan_yaml_files()
         self._stop_pending = False
 
@@ -136,6 +141,8 @@ class MusterApp(App):
                         yield EnvList(self._muster_config, id="env-list")
                     with Vertical(id="left-yaml"):
                         yield FileList(self._yaml_files, id="file-list")
+                    with Vertical(id="left-settings"):
+                        yield Static("")
 
                 with ContentSwitcher(initial="right-svc", id="right-content"):
                     with Vertical(id="right-svc"):
@@ -147,6 +154,7 @@ class MusterApp(App):
                         yield LogPanel(id="log")
                     yield EnvDetailPanel(id="right-env")
                     yield YamlPreview(id="right-yaml")
+                    yield SettingsPanel(self._settings, id="right-settings")
 
             # Custom footer bar with shortcut hints and mode badge
             with Horizontal(id="footer-bar"):
@@ -173,7 +181,10 @@ class MusterApp(App):
         """
         self.title = "muster"
         self._refresh_env_status()
-        self.set_interval(5, self._refresh_env_status)
+        self._env_timer = self.set_interval(
+            self._settings.env_refresh_interval, self._refresh_env_status
+        )
+        apply_to_app(self, self._settings)
 
         # svc tab: auto-select first service
         tree = self.query_one("#service-tree", ServiceTree)
@@ -294,24 +305,23 @@ class MusterApp(App):
 
     def _refresh_env_status(self) -> None:
         """Poll environment checks and refresh all indicators."""
+        from textual.css.query import NoMatches
+
         try:
             results = check_env(self._muster_config.env_checks)
+        except OSError as e:
+            self.log.error(f"env check failed: {e}")
+            return
 
-            # Refresh env indicator strip in svc tab
+        try:
             self.query_one("#env-indicator", EnvIndicator).refresh_indicators(results)
-
-            # Refresh env list in env tab
             self.query_one("#env-list", EnvList).refresh_checks(results)
-
-            # Refresh env detail panel if visible
             detail = self.query_one("#right-env", EnvDetailPanel)
             if detail.current_env is not None:
                 detail.refresh_content()
-
-            # Refresh mode badge
             self.query_one("#footer-mode", Static).update(self._mode_label())
-        except Exception as e:
-            self.log.error(f"refresh env status failed: {e}")
+        except NoMatches:
+            pass
 
     def _refresh_list_item(self, svc: Service) -> None:
         """Refresh a single service node in the tree and detail panel.
@@ -362,6 +372,19 @@ class MusterApp(App):
         elif event.action == "restart":
             asyncio.create_task(self._orchestrator.restart(svc, self.cmd_mode))
 
+    def on_settings_panel_settings_changed(
+        self, event: SettingsPanel.SettingsChanged
+    ) -> None:
+        """Apply new settings and persist them."""
+        from .core.settings_store import save_settings
+
+        if event.settings == self._settings:
+            return
+        self._settings = event.settings
+        apply_to_app(self, self._settings)
+        save_settings(self._settings)
+        self.notify("Settings saved", severity="success")
+
     # ---------- actions ----------
 
     def action_switch_tab(self, tab: str) -> None:
@@ -371,8 +394,13 @@ class MusterApp(App):
         activity_bar.active_tab = tab
 
         # Update left and right content switchers
-        self.query_one("#left-content", ContentSwitcher).current = f"left-{tab}"
-        self.query_one("#right-content", ContentSwitcher).current = f"right-{tab}"
+        left = self.query_one("#left-content", ContentSwitcher)
+        right = self.query_one("#right-content", ContentSwitcher)
+        left.current = f"left-{tab}"
+        right.current = f"right-{tab}"
+
+        # Settings uses a single full-width panel; hide the left column.
+        left.styles.display = "none" if tab == "settings" else "block"
 
     def action_cursor_down(self) -> None:
         """Move tree cursor down and update detail panel."""

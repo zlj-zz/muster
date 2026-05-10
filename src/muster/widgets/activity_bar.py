@@ -104,10 +104,13 @@ class ActivityBar(Vertical):
         super().__init__(**kwargs)
 
     def compose(self) -> ComposeResult:
-        """Yield the three default tabs."""
+        """Yield the four default tabs."""
         yield ActivityTab("svc", " ▣", "svc", tooltip="Services [1]", id="tab-svc")
         yield ActivityTab("env", " ◉", "env", tooltip="Environment [2]", id="tab-env")
         yield ActivityTab("yaml", " ≡", "yaml", tooltip="YAML Files [3]", id="tab-yaml")
+        yield ActivityTab(
+            "settings", " ⚙", "set", tooltip="Settings [4]", id="tab-settings"
+        )
 
     def watch_active_tab(self, tab_id: str) -> None:
         """Update the ``active`` CSS class on child tabs."""

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+import socket
 from datetime import datetime
 from pathlib import Path
 from collections.abc import Callable
@@ -47,6 +48,9 @@ class ServiceOrchestrator:
         self._on_log = on_log
         self._on_status = on_status
         self._on_notify = on_notify
+        self.stop_timeout: float = 8.0
+        self.health_timeout: int = 60
+        self.port_conflict_strategy: str = "kill"
         self._reader_tasks: dict[str, asyncio.Task] = {}
         self._health_tasks: dict[str, asyncio.Task] = {}
 
@@ -105,18 +109,10 @@ class ServiceOrchestrator:
         dep_names = [d.name for d in deps]
         self._log(svc.name, f"muster▸Dependencies: {dep_names}")
 
-        # Pre-emptively kill any process already bound to the target port so
-        # that the new instance can bind cleanly.
+        # Pre-emptively handle any process already bound to the target port.
         port = svc.port or resolve_port(svc.name, self.config.port_discovery)
-        if port:
-            try:
-                import socket
-
-                with socket.create_connection(("127.0.0.1", port), timeout=1.0):
-                    self._log(svc.name, f"muster▸Port {port} in use, cleaning up...")
-                    await kill_port_owner(port)
-            except OSError:
-                pass
+        if port and not await self._check_port_conflict(svc.name, port):
+            return
 
         # Build launch plan: one layer per group, ordered by group.order.
         order_map = {g.id: g.order for g in self.config.groups}
@@ -132,20 +128,10 @@ class ServiceOrchestrator:
             for s in layer_svcs:
                 if s.status not in (Status.STARTING, Status.RUNNING):
                     p = s.port or resolve_port(s.name, self.config.port_discovery)
-                    if p:
-                        try:
-                            import socket
-
-                            with socket.create_connection(
-                                ("127.0.0.1", p), timeout=1.0
-                            ):
-                                self._log(
-                                    svc.name,
-                                    f"muster▸Dep {s.name} port {p} in use, cleaning up...",
-                                )
-                                await kill_port_owner(p)
-                        except OSError:
-                            pass
+                    if p and not await self._check_port_conflict(
+                        svc.name, p, dep_name=s.name
+                    ):
+                        return
                     self._log(
                         svc.name,
                         f"muster▸Scheduling start: {s.name} (status: {s.status.value})",
@@ -267,7 +253,7 @@ class ServiceOrchestrator:
         if svc.proc and svc.proc.returncode is None:
             try:
                 os.killpg(os.getpgid(svc.proc.pid), signal.SIGTERM)
-                await asyncio.wait_for(svc.proc.wait(), timeout=8.0)
+                await asyncio.wait_for(svc.proc.wait(), timeout=self.stop_timeout)
             except asyncio.TimeoutError:
                 try:
                     os.killpg(os.getpgid(svc.proc.pid), signal.SIGKILL)
@@ -289,6 +275,40 @@ class ServiceOrchestrator:
         svc.log_lines.append(stopped_msg)
         self._log(svc.name, stopped_msg)
         self._notify(f"{svc.name} stopped", "information")
+
+    async def _check_port_conflict(
+        self, target_name: str, port: int, dep_name: str | None = None
+    ) -> bool:
+        """Handle a port already in use according to the configured strategy.
+
+        Args:
+            target_name: Name of the service being started.
+            port: The port to check.
+            dep_name: Name of the dependency (if checking a dep), otherwise None.
+
+        Returns:
+            ``True`` if it is safe to proceed, ``False`` if the start should abort.
+        """
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=1.0):
+                pass  # port is occupied
+        except OSError:
+            return True  # port is free
+
+        label = f"Dep {dep_name} " if dep_name else ""
+        msg = f"{label}port {port} in use"
+
+        if self.port_conflict_strategy == "kill":
+            self._log(target_name, f"muster▸{msg}, cleaning up...")
+            await kill_port_owner(port)
+            return True
+        elif self.port_conflict_strategy == "warn":
+            self._log(target_name, f"muster▸{msg}, skipping kill (warn mode)")
+            return True
+        else:  # "abort"
+            self._log(target_name, f"muster▸{msg}, aborting start")
+            self._notify(f"{msg}, start aborted", "error")
+            return False
 
     async def restart(self, svc: Service, mode: str = "default") -> None:
         """Restart a service.
@@ -410,7 +430,7 @@ class ServiceOrchestrator:
                     self._set_status(svc, Status.FAILED)
                 return
 
-            for i in range(60):
+            for i in range(self.health_timeout):
                 if svc.proc is None or svc.proc.returncode is not None:
                     self._set_status(svc, Status.FAILED)
                     self._log(svc.name, "muster▸Process exited, health check failed")

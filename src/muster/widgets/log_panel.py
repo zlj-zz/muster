@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from collections import deque
+from datetime import datetime
 
 from textual import events, on
 from textual.app import ComposeResult
@@ -52,6 +53,9 @@ class LogPanel(Vertical):
         self._search_dirty: bool = True
         self._log_level: str = "ALL"
         self._level_buttons: dict[str, Static] = {}
+        self.auto_scroll: bool = True
+        self.show_timestamp: bool = False
+        self.buffer_lines: int = 2000
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="log-level-row"):
@@ -93,9 +97,9 @@ class LogPanel(Vertical):
         self._search_count.update(f"{self._match_idx + 1}/{len(self._matches)}")
 
     def _sync_text_area(self) -> None:
-        """Push ``_displayed_lines`` into the TextArea and scroll to bottom."""
+        """Push ``_displayed_lines`` into the TextArea and optionally scroll."""
         self._text_area.text = "\n".join(self._displayed_lines)
-        if self._displayed_lines:
+        if self._displayed_lines and self.auto_scroll:
             self._text_area.move_cursor((len(self._displayed_lines) - 1, 0))
             self._text_area.scroll_end(animate=False)
 
@@ -173,7 +177,7 @@ class LogPanel(Vertical):
         self._svc_name = svc.name
         self.border_title = f"Logs: {svc.name}"
         if svc.log_lines:
-            self._buffer = deque(svc.log_lines, maxlen=2000)
+            self._buffer = deque(svc.log_lines, maxlen=self.buffer_lines)
             self._rebuild_display()
 
     def append_log(self, svc_name: str, line: str) -> None:
@@ -185,6 +189,8 @@ class LogPanel(Vertical):
         """
         if self._svc_name != svc_name:
             return
+        if self.show_timestamp:
+            line = f"{datetime.now().strftime('%H:%M:%S')} {line}"
         was_full = len(self._buffer) == self._buffer.maxlen
         self._buffer.append(line)
         if was_full:

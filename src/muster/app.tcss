@@ -173,52 +173,59 @@ Tree > .tree--highlight {
     margin-top: 0;
 }
 
-/* action buttons */
-#action-buttons {
+/* action buttons (detail panel + settings panel) */
+#action-buttons, #settings-actions {
     height: auto;
     padding: 0 1;
     border-top: solid #3e4451;
     background: #2c313c;
 }
 
-#action-buttons Button {
+#action-buttons Button, #settings-actions Button {
     width: auto;
     margin: 0 1 0 0;
     padding: 0;
     content-align: center middle;
 }
 
-#action-buttons Button.-style-flat.-success {
+#action-buttons Button.-style-flat.-success,
+#settings-actions Button.-style-flat.-success {
     background: #98c379;
     border: block #98c379;
     color: #1e2227;
 }
-#action-buttons Button.-style-flat.-success:hover {
+#action-buttons Button.-style-flat.-success:hover,
+#settings-actions Button.-style-flat.-success:hover {
     background: #a5d48a;
     border: block #a5d48a;
 }
 
-#action-buttons Button.-style-flat.-error {
+#action-buttons Button.-style-flat.-error,
+#settings-actions Button.-style-flat.-error {
     background: #e06c75;
     border: block #e06c75;
     color: #1e2227;
 }
-#action-buttons Button.-style-flat.-error:hover {
+#action-buttons Button.-style-flat.-error:hover,
+#settings-actions Button.-style-flat.-error:hover {
     background: #ec8088;
     border: block #ec8088;
 }
 
-#action-buttons Button.-style-flat.-warning {
+#action-buttons Button.-style-flat.-warning,
+#settings-actions Button.-style-flat.-warning {
     background: #e5c07b;
     border: block #e5c07b;
     color: #1e2227;
 }
-#action-buttons Button.-style-flat.-warning:hover {
+#action-buttons Button.-style-flat.-warning:hover,
+#settings-actions Button.-style-flat.-warning:hover {
     background: #efd08f;
     border: block #efd08f;
 }
 
-#action-buttons Button:disabled {
+#action-buttons Button:disabled,
+#settings-actions Button:disabled {
     background: #252830;
     border: block #252830;
     color: #5c6370;
@@ -377,4 +384,111 @@ Tree, TextArea, VerticalScroll, DataTable {
     padding: 0 2;
     border-left: thick #eab459;
     content-align: center middle;
+}
+
+/* ========== Settings Panel ========== */
+#left-settings {
+    width: 100%;
+    height: 1fr;
+    display: none;
+}
+
+#right-settings {
+    width: 100%;
+    height: 1fr;
+    background: #2c313c;
+    padding: 1 2;
+}
+
+.settings-section {
+    height: auto;
+    margin: 1 0;
+    border-bottom: solid #3e4451;
+    padding-bottom: 1;
+}
+
+.settings-section-title {
+    color: #eab459;
+    text-style: bold;
+    height: auto;
+    margin-bottom: 1;
+}
+
+.settings-row {
+    height: 3;
+    margin: 0 0 1 0;
+    padding: 0 1;
+    content-align: left middle;
+}
+
+.settings-label {
+    width: 18;
+    height: 100%;
+    color: #abb2bf;
+    content-align: left middle;
+}
+
+.settings-unit {
+    width: auto;
+    height: 100%;
+    color: #5c6370;
+    content-align: left middle;
+}
+
+/* unify control backgrounds */
+.settings-row Input {
+    height: 100%;
+    width: 80%;
+    border: tall #282c34;
+    background: #282c34;
+    color: #abb2bf;
+    padding: 0 1;
+}
+
+.settings-row Select {
+    height: 100%;
+    width: 80%;
+    border: none;
+    color: #abb2bf;
+    padding: 0 0;
+}
+
+.settings-row SelectCurrent {
+    background: #282c34;
+    border: tall #282c34;
+}
+
+.settings-row Select:focus > SelectCurrent {
+    border: tall #eab459;
+    background-tint: transparent;
+}
+
+SelectOverlay {
+    border: tall #3e4451;
+    background: #282c34;
+}
+
+SelectOverlay > .option-list--option {
+    padding: 0 1;
+}
+
+#right-settings Switch {
+    height: 100%;
+    border: none;
+    background: transparent;
+    padding: 0;
+    content-align: left middle;
+}
+
+#right-settings Switch .switch--slider {
+    color: #5c6370;
+    background: #3e4451;
+}
+
+#right-settings Switch.-on .switch--slider {
+    color: #98c379;
+}
+
+#settings-actions Button {
+    margin: 0 1 0 0;
 }
