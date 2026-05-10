@@ -56,3 +56,12 @@ htmlcov/
 dmypy.json
 
 example/muster_crm.yaml
+
+# MkDocs
+site/
+
+# Design assets
+design/
+
+# Screenshot previews
+mkdocs-*.png

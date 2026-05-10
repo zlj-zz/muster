@@ -1,0 +1,544 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="muster-home">
+    <style>
+      .muster-home {
+        --ctp-crust: #11111b;
+        --ctp-mantle: #181825;
+        --ctp-base: #1e1e2e;
+        --ctp-surface0: #313244;
+        --ctp-surface1: #45475a;
+        --ctp-overlay0: #6c7086;
+        --ctp-overlay1: #7f849c;
+        --ctp-text: #cdd6f4;
+        --ctp-lavender: #b4befe;
+        --ctp-blue: #89b4fa;
+        --ctp-teal: #94e2d5;
+        --ctp-green: #a6e3a1;
+        --ctp-yellow: #f9e2af;
+        --ctp-peach: #fab387;
+        --ctp-red: #f38ba8;
+        --ctp-mauve: #cba6f7;
+        --ctp-pink: #f5c2e7;
+        --ctp-vibrant: #eab459;
+        --font-mono: 'JetBrains Mono', Consolas, monospace;
+        --font-body: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      .muster-home {
+        font-family: var(--font-body);
+        background: var(--ctp-crust);
+        color: var(--ctp-text);
+        line-height: 1.6;
+      }
+
+      .muster-home * {
+        box-sizing: border-box;
+      }
+
+      /* ── Hero ── */
+      .mh-hero {
+        padding: 32px 24px 32px;
+        max-width: 1200px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1.2fr;
+        gap: 48px;
+        align-items: center;
+      }
+
+      .mh-hero-left {
+        max-width: 520px;
+      }
+
+      .mh-hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        border: 1px solid var(--ctp-surface1);
+        font-size: 13px;
+        color: var(--ctp-overlay1);
+        margin-bottom: 28px;
+        font-family: var(--font-mono);
+      }
+
+      .mh-hero-badge .dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: var(--ctp-vibrant);
+        box-shadow: 0 0 8px rgba(234, 180, 89, 0.5);
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+
+      .mh-hero h1 {
+        font-family: var(--font-mono);
+        font-size: 48px;
+        font-weight: 700;
+        line-height: 1.1;
+        margin-bottom: 20px;
+        letter-spacing: -2px;
+        color: var(--ctp-text);
+        border: none;
+        padding: 0;
+      }
+
+      .mh-hero h1 em {
+        color: var(--ctp-vibrant);
+        font-style: normal;
+      }
+
+      .mh-hero-desc {
+        font-size: 19px;
+        color: var(--ctp-subtext0);
+        margin-bottom: 32px;
+        line-height: 1.7;
+      }
+
+      .mh-hero-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .mh-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        font-family: var(--font-body);
+      }
+
+      .mh-btn-primary,
+      .mh-btn-primary:hover,
+      .mh-btn-primary:focus {
+        background: var(--ctp-vibrant);
+        color: var(--ctp-crust) !important;
+        box-shadow: 0 4px 16px rgba(234, 180, 89, 0.25);
+      }
+
+      .mh-btn-primary:hover {
+        background: #f0c06a;
+        box-shadow: 0 6px 28px rgba(234, 180, 89, 0.45);
+        transform: translateY(-1px);
+        text-decoration: none;
+      }
+
+      .mh-btn-secondary {
+        background: transparent;
+        color: var(--ctp-overlay1);
+        border: 1px solid var(--ctp-surface1);
+      }
+
+      .mh-btn-secondary:hover {
+        border-color: var(--ctp-vibrant);
+        color: var(--ctp-vibrant);
+        background: rgba(234, 180, 89, 0.06);
+        text-decoration: none;
+      }
+
+      /* ── Terminal Demo ── */
+      .mh-terminal {
+        border-radius: 12px;
+        border: 1px solid var(--ctp-surface1);
+        background: var(--ctp-base);
+        overflow: hidden;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      }
+
+      .mh-terminal-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--ctp-surface0);
+        background: var(--ctp-mantle);
+      }
+
+      .mh-terminal-header .dot {
+        width: 12px; height: 12px;
+        border-radius: 50%;
+      }
+
+      .mh-dot-red { background: var(--ctp-red); }
+      .mh-dot-yellow { background: var(--ctp-yellow); }
+      .mh-dot-green { background: var(--ctp-green); }
+
+      .mh-terminal-header span {
+        font-size: 12px;
+        color: var(--ctp-overlay0);
+        font-family: var(--font-mono);
+        margin-left: auto;
+      }
+
+      .mh-terminal-body {
+        padding: 20px 24px;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.8;
+        min-height: 200px;
+      }
+
+      .mh-terminal-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .mh-terminal-prompt {
+        color: var(--ctp-vibrant);
+        font-weight: 700;
+      }
+
+      .mh-terminal-cursor {
+        display: inline-block;
+        width: 8px;
+        height: 16px;
+        background: var(--ctp-vibrant);
+        animation: blink 1s step-end infinite;
+        vertical-align: middle;
+      }
+
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
+      .mh-terminal-output {
+        color: var(--ctp-overlay1);
+        margin: 4px 0 4px 24px;
+      }
+
+      .mh-terminal-success { color: var(--ctp-green); }
+      .mh-terminal-warn { color: var(--ctp-yellow); }
+
+      /* ── Screenshot ── */
+      .mh-screenshot-section {
+        padding: 32px 24px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .mh-section-label {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--ctp-vibrant);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 12px;
+      }
+
+      .mh-section-title {
+        font-size: 32px;
+        font-weight: 700;
+        margin-bottom: 16px;
+        letter-spacing: -0.5px;
+        color: var(--ctp-text);
+        border: none;
+        padding: 0;
+      }
+
+      .mh-section-desc {
+        font-size: 18px;
+        color: var(--ctp-overlay1);
+        max-width: 600px;
+        margin-bottom: 40px;
+      }
+
+      .mh-screenshot {
+        border-radius: 12px;
+        border: 1px solid var(--ctp-surface1);
+        overflow: hidden;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+        line-height: 0;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .mh-screenshot img {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      /* ── Features ── */
+      .mh-features {
+        padding: 48px 24px;
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+
+      .mh-feature-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+
+      .mh-feature-card {
+        padding: 28px;
+        border-radius: 12px;
+        border: 1px solid var(--ctp-surface0);
+        background: var(--ctp-base);
+        transition: all 0.2s;
+      }
+
+      .mh-feature-card:hover {
+        border-color: var(--ctp-vibrant);
+        background: var(--ctp-surface0);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 24px rgba(234, 180, 89, 0.08);
+      }
+
+      .mh-feature-icon {
+        width: 40px; height: 40px;
+        border-radius: 8px;
+        background: rgba(234, 180, 89, 0.1);
+        border: 1px solid rgba(234, 180, 89, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        margin-bottom: 16px;
+        color: var(--ctp-vibrant);
+      }
+
+      .mh-feature-card h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: var(--ctp-text);
+      }
+
+      .mh-feature-card p {
+        font-size: 14px;
+        color: var(--ctp-overlay1);
+        line-height: 1.6;
+        margin: 0;
+      }
+
+      /* ── Install ── */
+      .mh-install {
+        padding: 48px 24px;
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+      }
+
+      .mh-install-code {
+        margin-top: 32px;
+        border-radius: 12px;
+        border: 1px solid var(--ctp-surface1);
+        background: var(--ctp-base);
+        overflow: hidden;
+        text-align: left;
+      }
+
+      .mh-install-code pre {
+        margin: 0;
+        padding: 20px 24px;
+        font-family: var(--font-mono);
+        font-size: 14px;
+        line-height: 1.8;
+        background: none;
+        border: none;
+      }
+
+      .mh-install-code code {
+        font-family: inherit;
+        color: var(--ctp-text);
+        background: none;
+        border: none;
+        padding: 0;
+      }
+
+      /* ── Responsive ── */
+      @media (max-width: 900px) {
+        .mh-hero {
+          grid-template-columns: 1fr;
+          text-align: center;
+          padding: 24px 24px;
+        }
+        .mh-hero-left { margin: 0 auto; }
+        .mh-hero-actions { justify-content: center; }
+        .mh-hero h1 { font-size: 36px; }
+        .mh-feature-grid { grid-template-columns: 1fr; }
+        .mh-screenshot-section { padding: 24px 24px; }
+        .mh-features { padding: 32px 24px; }
+        .mh-install { padding: 32px 24px; }
+      }
+    </style>
+
+    <!-- Hero -->
+    <section class="mh-hero">
+      <div class="mh-hero-left">
+        <div class="mh-hero-badge">
+          <span class="dot"></span>
+          <span>v0.5.0 — Now Available</span>
+        </div>
+        <h1>A TUI dashboard<br><em>for local services</em></h1>
+        <p class="mh-hero-desc">
+          Start, stop, and monitor all your services from the terminal.
+          Dependency-aware startup, real-time logs, health checks.
+        </p>
+        <div class="mh-hero-actions">
+          <a href="getting-started/" class="mh-btn mh-btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+            Quick Start
+          </a>
+          <a href="{{ config.repo_url }}" class="mh-btn mh-btn-secondary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            GitHub
+          </a>
+        </div>
+      </div>
+
+      <div class="mh-terminal">
+        <div class="mh-terminal-header">
+          <span class="dot mh-dot-red"></span>
+          <span class="dot mh-dot-yellow"></span>
+          <span class="dot mh-dot-green"></span>
+          <span>zsh</span>
+        </div>
+        <div class="mh-terminal-body">
+          <div class="mh-terminal-line">
+            <span class="mh-terminal-prompt">$</span>
+            <span>pip install muster</span>
+          </div>
+          <div class="mh-terminal-output mh-terminal-success">Successfully installed muster-0.5.0</div>
+          <div class="mh-terminal-line">
+            <span class="mh-terminal-prompt">$</span>
+            <span>muster -f muster-compose.yaml</span>
+          </div>
+          <div class="mh-terminal-output">
+            <span class="mh-terminal-warn">TUI launching...</span><br>
+            <span class="mh-terminal-success">12 services loaded</span> | 3 groups | 4 env checks
+          </div>
+          <div class="mh-terminal-line" style="margin-top: 8px;">
+            <span class="mh-terminal-prompt">$</span>
+            <span class="mh-terminal-cursor"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screenshot -->
+    <section class="mh-screenshot-section">
+      <p class="mh-section-label">See it in action</p>
+      <h2 class="mh-section-title">Your services, visualized</h2>
+      <p class="mh-section-desc">
+        muster renders a live dashboard in your terminal. Tree view, detail panels,
+        logs, resource usage — all at a glance.
+      </p>
+
+      <div class="mh-screenshot">
+        <img alt="muster TUI dashboard" src="assets/muster-app.png" />
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="mh-features">
+      <p class="mh-section-label">Features</p>
+      <h2 class="mh-section-title">Built for developer workflows</h2>
+
+      <div class="mh-feature-grid">
+        <div class="mh-feature-card">
+          <div class="mh-feature-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <h3>Tree View</h3>
+          <p>Services grouped by configurable categories with dynamic colors and live status indicators.</p>
+        </div>
+        <div class="mh-feature-card">
+          <div class="mh-feature-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/>
+            </svg>
+          </div>
+          <h3>Dependency Startup</h3>
+          <p>Auto-resolves service dependencies and starts them in the correct topological order.</p>
+        </div>
+        <div class="mh-feature-card">
+          <div class="mh-feature-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>
+            </svg>
+          </div>
+          <h3>Real-time Logs</h3>
+          <p>Per-service log streaming with auto-scroll, syntax highlighting, and copy support.</p>
+        </div>
+        <div class="mh-feature-card">
+          <div class="mh-feature-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+          <h3>Health Checks</h3>
+          <p>TCP, HTTP, and process health monitoring with latency measurement and status bar indicators.</p>
+        </div>
+        <div class="mh-feature-card">
+          <div class="mh-feature-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8"/><path d="M12 17v4"/>
+            </svg>
+          </div>
+          <h3>Environment Monitor</h3>
+          <p>Live indicators for etcd, MySQL, Redis, or any custom TCP/HTTP dependency.</p>
+        </div>
+        <div class="mh-feature-card">
+          <div class="mh-feature-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          </div>
+          <h3>Command Modes</h3>
+          <p>Each service can define default, test, prod, or custom command maps. Cycle modes with one key.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Install -->
+    <section class="mh-install">
+      <p class="mh-section-label">Installation</p>
+      <h2 class="mh-section-title">One command away</h2>
+      <p class="mh-section-desc">Requires Python 3.10+. Install from PyPI and launch in seconds.</p>
+
+      <div class="mh-install-code">
+        <div class="mh-terminal-header">
+          <span class="dot mh-dot-red"></span>
+          <span class="dot mh-dot-yellow"></span>
+          <span class="dot mh-dot-green"></span>
+          <span>zsh</span>
+        </div>
+        <pre><code><span class="mh-terminal-prompt">$</span> <span style="color: var(--ctp-text);">pip install muster</span>
+<span style="color: var(--ctp-green);">Successfully installed muster-0.5.0</span>
+
+<span class="mh-terminal-prompt">$</span> <span style="color: var(--ctp-text);">muster --version</span>
+muster 0.5.0
+
+<span class="mh-terminal-prompt">$</span> <span style="color: var(--ctp-text);">muster -f muster-compose.yaml</span>
+<span style="color: var(--ctp-vibrant);">TUI dashboard running. Press 'q' to quit.</span></code></pre>
+      </div>
+    </section>
+  </div>
+{% endblock %}
