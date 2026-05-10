@@ -169,7 +169,9 @@ class TestLoadTodayLogs:
             lambda svc, now=None: tmp_path / f"{svc}.log",
         )
         logfile = tmp_path / "api.log"
-        logfile.write_text("\n".join(f"line {i}" for i in range(2500)), encoding="utf-8")
+        logfile.write_text(
+            "\n".join(f"line {i}" for i in range(2500)), encoding="utf-8"
+        )
 
         from muster.core.orchestrator import load_today_logs
 

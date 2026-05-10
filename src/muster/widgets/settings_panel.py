@@ -14,6 +14,14 @@ from textual.widgets import Button, Input, Select, Static, Switch
 from ..models import AppSettings
 
 
+class SettingsLabel(Static):
+    """A settings row label with an optional tooltip."""
+
+    def __init__(self, text: str, tooltip: str = "", **kwargs) -> None:
+        super().__init__(text, classes="settings-label", **kwargs)
+        self.tooltip = tooltip
+
+
 class SettingsPanel(VerticalScroll):
     """Editable settings form posted inside the right-content switcher.
 
@@ -32,7 +40,10 @@ class SettingsPanel(VerticalScroll):
             yield Static("General", classes="settings-section-title")
 
             with Horizontal(classes="settings-row"):
-                yield Static("Env refresh", classes="settings-label")
+                yield SettingsLabel(
+                    "Env refresh",
+                    "Seconds between environment health check polls",
+                )
                 yield Input(
                     str(self.settings.env_refresh_interval),
                     id="input-env-interval",
@@ -40,7 +51,10 @@ class SettingsPanel(VerticalScroll):
                 yield Static("s", classes="settings-unit")
 
             with Horizontal(classes="settings-row"):
-                yield Static("Port conflict", classes="settings-label")
+                yield SettingsLabel(
+                    "Port conflict",
+                    "What to do when a service port is already in use",
+                )
                 yield Select(
                     [("Auto kill", "kill"), ("Warn only", "warn"), ("Abort", "abort")],
                     allow_blank=False,
@@ -53,21 +67,30 @@ class SettingsPanel(VerticalScroll):
             yield Static("Logs", classes="settings-section-title")
 
             with Horizontal(classes="settings-row"):
-                yield Static("Auto-scroll", classes="settings-label")
+                yield SettingsLabel(
+                    "Auto-scroll",
+                    "Scroll to the bottom on every new log line",
+                )
                 yield Switch(
                     value=self.settings.log_auto_scroll,
                     id="switch-auto-scroll",
                 )
 
             with Horizontal(classes="settings-row"):
-                yield Static("Timestamps", classes="settings-label")
+                yield SettingsLabel(
+                    "Timestamps",
+                    "Prefix each log line with the current time",
+                )
                 yield Switch(
                     value=self.settings.log_show_timestamp,
                     id="switch-timestamps",
                 )
 
             with Horizontal(classes="settings-row"):
-                yield Static("Default level", classes="settings-label")
+                yield SettingsLabel(
+                    "Default level",
+                    "Initial log-level filter shown in the log panel",
+                )
                 yield Select(
                     [
                         ("ALL", "ALL"),
@@ -82,14 +105,20 @@ class SettingsPanel(VerticalScroll):
                 )
 
             with Horizontal(classes="settings-row"):
-                yield Static("Buffer lines", classes="settings-label")
+                yield SettingsLabel(
+                    "Buffer lines",
+                    "Maximum number of log lines kept in memory",
+                )
                 yield Input(
                     str(self.settings.log_buffer_lines),
                     id="input-buffer-lines",
                 )
 
             with Horizontal(classes="settings-row"):
-                yield Static("Load history", classes="settings-label")
+                yield SettingsLabel(
+                    "Load history",
+                    "Load today's disk logs when viewing a service for the first time",
+                )
                 yield Switch(
                     value=self.settings.load_history_on_startup,
                     id="switch-load-history",
@@ -100,7 +129,10 @@ class SettingsPanel(VerticalScroll):
             yield Static("Timing", classes="settings-section-title")
 
             with Horizontal(classes="settings-row"):
-                yield Static("Health timeout", classes="settings-label")
+                yield SettingsLabel(
+                    "Health timeout",
+                    "Seconds to wait for a service port to become ready",
+                )
                 yield Input(
                     str(self.settings.health_timeout),
                     id="input-health-timeout",
@@ -108,7 +140,10 @@ class SettingsPanel(VerticalScroll):
                 yield Static("s", classes="settings-unit")
 
             with Horizontal(classes="settings-row"):
-                yield Static("Stop timeout", classes="settings-label")
+                yield SettingsLabel(
+                    "Stop timeout",
+                    "Seconds to wait for graceful shutdown before SIGKILL",
+                )
                 yield Input(
                     str(self.settings.stop_timeout),
                     id="input-stop-timeout",
