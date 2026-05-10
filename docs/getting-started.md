@@ -2,16 +2,18 @@
 
 ## Installation
 
-muster requires **Python 3.10 or later**. Install via pip:
+muster requires **Python 3.10 or later**. Install via the one-liner:
 
 ```bash
-pip install muster
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/zlj-zz/muster/main/install.sh)"
 ```
 
-Verify the installation:
+Or clone and install manually:
 
 ```bash
-muster --version
+git clone https://github.com/zlj-zz/muster.git
+cd muster
+pip install -e .
 ```
 
 ## Quick Start

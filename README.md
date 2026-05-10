@@ -7,7 +7,7 @@ A TUI-based service orchestrator for local development. Think of it as a mini da
 <img width="978" alt="Image" src="https://github.com/user-attachments/assets/da43f353-be93-4183-b746-d2d551f8b8c6" />
 
 ```bash
-pip install muster
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/zlj-zz/muster/main/install.sh)"
 muster -f muster-compose.yaml
 ```
 
