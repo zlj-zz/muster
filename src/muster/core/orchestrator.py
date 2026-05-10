@@ -117,9 +117,7 @@ class ServiceOrchestrator:
         """Return the asyncio.Lock for *svc_name*, creating one if necessary."""
         return self._locks.setdefault(svc_name, asyncio.Lock())
 
-    def _set_status(
-        self, svc: Service, status: Status, *, force: bool = False
-    ) -> None:
+    def _set_status(self, svc: Service, status: Status, *, force: bool = False) -> None:
         """Update a service's status and notify the UI.
 
         Guards against illegal transitions unless *force* is ``True``.

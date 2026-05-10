@@ -11,6 +11,8 @@ import asyncio
 import glob
 from pathlib import Path
 
+import psutil
+
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -18,6 +20,7 @@ from textual.widgets import ContentSwitcher, Static
 
 from .core.env import check_env
 from .core.orchestrator import ServiceOrchestrator
+from .core.process import get_cpu_memory_percent
 from .core.settings_store import apply_to_app, load_settings
 from .models import Group, MusterConfig, Service, Status
 from .widgets import (
@@ -94,6 +97,7 @@ class MusterApp(App):
         )
         self._settings = load_settings()
         self._env_timer = None
+        self._resource_timer = None
         self._yaml_files = self._scan_yaml_files()
         self._stop_pending = False
 
@@ -184,6 +188,7 @@ class MusterApp(App):
         self._env_timer = self.set_interval(
             self._settings.env_refresh_interval, self._refresh_env_status
         )
+        self._resource_timer = self.set_interval(2, self._refresh_resources)
         apply_to_app(self, self._settings)
 
         # svc tab: auto-select first service
@@ -322,6 +327,32 @@ class MusterApp(App):
             if detail.current_env is not None:
                 detail.refresh_content()
             self.query_one("#footer-mode", Static).update(self._mode_label())
+        except NoMatches:
+            pass
+
+    async def _refresh_resources(self) -> None:
+        """Poll process resources and refresh the detail panel.
+
+        Runs every 2 seconds via ``set_interval``.  Uses ``asyncio.to_thread``
+        so the blocking ``psutil`` call does not stall the UI event loop.
+        """
+        from textual.css.query import NoMatches
+
+        try:
+            detail = self.query_one("#detail", DetailPanel)
+            svc = detail.current_service
+            if not svc or not svc.proc:
+                detail.update_resources(None, None)
+                return
+
+            try:
+                proc = psutil.Process(svc.proc.pid)
+                cpu, mem = await asyncio.to_thread(get_cpu_memory_percent, proc)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                detail.update_resources(None, None)
+                return
+
+            detail.update_resources(cpu, mem)
         except NoMatches:
             pass
 
@@ -507,6 +538,8 @@ class MusterApp(App):
         if self._cleaned_up:
             return
         self._cleaned_up = True
+        if self._resource_timer is not None:
+            self._resource_timer.stop()
         await self._orchestrator.stop_all(self.all_services)
         await self._orchestrator.cleanup()
 

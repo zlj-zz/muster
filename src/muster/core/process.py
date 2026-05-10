@@ -10,6 +10,22 @@ import asyncio
 import os
 import signal
 
+import psutil
+
+
+def get_cpu_memory_percent(proc: psutil.Process) -> tuple[float, float]:
+    """Return CPU and memory percent for a process.
+
+    Args:
+        proc: A psutil.Process instance.
+
+    Returns:
+        Tuple of (cpu_percent, memory_percent).
+    """
+    cpu = proc.cpu_percent(interval=0)
+    mem = proc.memory_percent()
+    return cpu, mem
+
 
 async def kill_port_owner(port: int) -> None:
     """Kill any process currently listening on the given port.

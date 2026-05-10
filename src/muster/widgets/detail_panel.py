@@ -17,7 +17,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.reactive import reactive
-from textual.widgets import Button, Static
+from textual.widgets import Button, Collapsible, Static
 
 from ..models import Group, Service, Status
 
@@ -55,63 +55,79 @@ class DetailPanel(Static):
         self._last_service: Service | None = None
         self._cached_rows: list[Horizontal] | None = None
         self._cached_buttons: tuple[Button, Button, Button] | None = None
+        self._cached_cpu_widget: Static | None = None
+        self._cached_mem_widget: Static | None = None
+        self._last_cpu: float | None = None
+        self._last_mem: float | None = None
 
     def compose(self) -> ComposeResult:
         with Vertical(id="detail-container"):
-            with VerticalScroll(id="detail-meta"):
-                yield Horizontal(
-                    Static("Name", classes="detail-key"),
-                    Static("", classes="detail-value"),
-                    classes="detail-row",
-                )
-                yield Horizontal(
-                    Static("Group", classes="detail-key"),
-                    Static("", classes="detail-value"),
-                    classes="detail-row",
-                )
-                yield Horizontal(
-                    Static("Status", classes="detail-key"),
-                    Static("", classes="detail-value"),
-                    classes="detail-row",
-                )
-                yield Horizontal(
-                    Static("Port", classes="detail-key"),
-                    Static("", classes="detail-value"),
-                    classes="detail-row",
-                )
-                yield Horizontal(
-                    Static("Deps", classes="detail-key"),
-                    Static("", classes="detail-value"),
-                    classes="detail-row",
-                )
-                yield Horizontal(
-                    Static("PID", classes="detail-key"),
-                    Static("", classes="detail-value"),
-                    classes="detail-row",
-                )
-                yield Horizontal(
-                    Static("Started", classes="detail-key"),
-                    Static("", classes="detail-value"),
-                    classes="detail-row",
-                )
-                yield Horizontal(
-                    Static("Uptime", classes="detail-key"),
-                    Static("", classes="detail-value"),
-                    classes="detail-row",
-                )
-                yield Horizontal(
-                    Static("Restarts", classes="detail-key"),
-                    Static("", classes="detail-value"),
-                    classes="detail-row",
-                )
-                yield Horizontal(
-                    Static("Last Error", classes="detail-key"),
-                    Static("", classes="detail-value"),
-                    classes="detail-row",
-                )
-                with Vertical(id="detail-command"):
-                    yield Static("Command", classes="detail-section-title")
-                    yield Static("", classes="detail-code")
+            with Horizontal(id="detail-top"):
+                with VerticalScroll(id="detail-meta"):
+                    yield Horizontal(
+                        Static("Name", classes="detail-key"),
+                        Static("", classes="detail-value"),
+                        classes="detail-row",
+                    )
+                    yield Horizontal(
+                        Static("Group", classes="detail-key"),
+                        Static("", classes="detail-value"),
+                        classes="detail-row",
+                    )
+                    yield Horizontal(
+                        Static("Status", classes="detail-key"),
+                        Static("", classes="detail-value"),
+                        classes="detail-row",
+                    )
+                    yield Horizontal(
+                        Static("Port", classes="detail-key"),
+                        Static("", classes="detail-value"),
+                        classes="detail-row",
+                    )
+                    yield Horizontal(
+                        Static("Deps", classes="detail-key"),
+                        Static("", classes="detail-value"),
+                        classes="detail-row",
+                    )
+                    yield Horizontal(
+                        Static("PID", classes="detail-key"),
+                        Static("", classes="detail-value"),
+                        classes="detail-row",
+                    )
+                    yield Horizontal(
+                        Static("Started", classes="detail-key"),
+                        Static("", classes="detail-value"),
+                        classes="detail-row",
+                    )
+                    yield Horizontal(
+                        Static("Uptime", classes="detail-key"),
+                        Static("", classes="detail-value"),
+                        classes="detail-row",
+                    )
+                    yield Horizontal(
+                        Static("Restarts", classes="detail-key"),
+                        Static("", classes="detail-value"),
+                        classes="detail-row",
+                    )
+                    yield Horizontal(
+                        Static("Last Error", classes="detail-key"),
+                        Static("", classes="detail-value"),
+                        classes="detail-row",
+                    )
+                with Vertical(id="detail-resources"):
+                    yield Static("Resources", classes="detail-section-title")
+                    yield Horizontal(
+                        Static("CPU", classes="resource-label"),
+                        Static("", classes="resource-value", id="res-cpu"),
+                        classes="resource-row",
+                    )
+                    yield Horizontal(
+                        Static("MEM", classes="resource-label"),
+                        Static("", classes="resource-value", id="res-mem"),
+                        classes="resource-row",
+                    )
+            with Collapsible(title="Command", collapsed=True, id="detail-command"):
+                yield Static("", classes="detail-code")
             with Horizontal(id="action-buttons"):
                 yield Button.success("Start", flat=True, id="btn-start")
                 yield Button.error("Stop", flat=True, id="btn-stop")
@@ -149,12 +165,14 @@ class DetailPanel(Static):
         if svc is None:
             for row in rows:
                 row.styles.display = "none"
-            self.query_one("#detail-command", Vertical).styles.display = "none"
+            self.query_one("#detail-top", Horizontal).styles.display = "none"
+            self.query_one("#detail-command", Collapsible).styles.display = "none"
             return
 
         for row in rows:
             row.styles.display = "block"
-        self.query_one("#detail-command", Vertical).styles.display = "block"
+        self.query_one("#detail-top", Horizontal).styles.display = "block"
+        self.query_one("#detail-command", Collapsible).styles.display = "block"
 
         group = next((g for g in self._groups if g.id == svc.group), None)
         group_color = group.color if group else "#cccccc"
@@ -191,6 +209,65 @@ class DetailPanel(Static):
         code_widget = self.query_one(".detail-code", Static)
         code_widget.update(
             Syntax(cmd_text, "bash", theme="monokai", background_color="default")
+        )
+
+        if not svc.proc:
+            self.update_resources(None, None)
+
+    def update_resources(self, cpu: float | None, mem: float | None) -> None:
+        """Update the resource card with new CPU and MEM values.
+
+        Args:
+            cpu: CPU percentage (0-100+), or ``None`` if unavailable.
+            mem: Memory percentage (0-100+), or ``None`` if unavailable.
+        """
+        if self._cached_cpu_widget is None:
+            self._cached_cpu_widget = self.query_one("#res-cpu", Static)
+            self._cached_mem_widget = self.query_one("#res-mem", Static)
+
+        if (
+            cpu is not None
+            and mem is not None
+            and cpu == self._last_cpu
+            and mem == self._last_mem
+        ):
+            return
+        self._last_cpu = cpu
+        self._last_mem = mem
+
+        if cpu is None or mem is None:
+            self._cached_cpu_widget.update("—")
+            self._cached_mem_widget.update("—")
+            return
+
+        self._cached_cpu_widget.update(self._resource_text(cpu))
+        self._cached_mem_widget.update(self._resource_text(mem))
+
+    @staticmethod
+    def _resource_text(percent: float) -> Text:
+        """Build a coloured progress-bar Text for a resource metric.
+
+        Args:
+            percent: Percentage value (0-100+).
+
+        Returns:
+            A ``RichText`` with a block-char bar and percentage.
+        """
+        width = 10
+        filled = int(width * percent / 100)
+        filled = min(filled, width)
+        bar = "█" * filled + "░" * (width - filled)
+
+        if percent >= 95:
+            color = "#e06c75"
+        elif percent >= 80:
+            color = "#e5c07b"
+        else:
+            color = "#98c379"
+
+        return Text.assemble(
+            (f"[{bar}] ", color),
+            (f"{percent:.1f}%", f"bold {color}"),
         )
 
     def _update_buttons(self, svc: Service | None) -> None:

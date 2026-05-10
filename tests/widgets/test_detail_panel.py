@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from textual.widgets import Button
+from textual.widgets import Button, Static
 
 from muster.models import Group, Service, Status
 from muster.widgets.detail_panel import DetailPanel
@@ -138,3 +138,49 @@ class TestDetailPanelMessages:
             await pilot.pause()
             assert len(messages) == 1
             assert messages[0].action == "restart"
+
+
+class TestDetailPanelResources:
+    """Resource card display."""
+
+    async def test_resources_show_dashes_when_stopped(self, detail_panel):
+        app = WidgetTestApp(detail_panel)
+        async with app.run_test() as pilot:
+            panel = app.query_one(DetailPanel)
+            panel.update_resources(None, None)
+            await pilot.pause()
+
+            cpu = panel.query_one("#res-cpu", Static)
+            mem = panel.query_one("#res-mem", Static)
+            assert cpu.content == "—"
+            assert mem.content == "—"
+
+    async def test_resources_render_values(self, detail_panel):
+        app = WidgetTestApp(detail_panel)
+        async with app.run_test() as pilot:
+            panel = app.query_one(DetailPanel)
+            panel.update_resources(45.0, 30.0)
+            await pilot.pause()
+
+            cpu = panel.query_one("#res-cpu", Static)
+            mem = panel.query_one("#res-mem", Static)
+            assert "45.0%" in cpu.content.plain
+            assert "30.0%" in mem.content.plain
+
+    @pytest.mark.parametrize(
+        "value,expected_color",
+        [
+            (45.0, "#98c379"),
+            (85.0, "#e5c07b"),
+            (95.0, "#e06c75"),
+        ],
+    )
+    async def test_resource_color(self, detail_panel, value, expected_color):
+        app = WidgetTestApp(detail_panel)
+        async with app.run_test() as pilot:
+            panel = app.query_one(DetailPanel)
+            panel.update_resources(value, value)
+            await pilot.pause()
+
+            cpu = panel.query_one("#res-cpu", Static)
+            assert expected_color in str(cpu.content.spans)

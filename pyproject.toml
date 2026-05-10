@@ -13,6 +13,7 @@ dependencies = [
     "textual[syntax]>=0.50.0",
     "pyyaml>=6.0",
     "rich>=13.0.0",
+    "psutil>=5.9.0",
 ]
 
 [project.optional-dependencies]

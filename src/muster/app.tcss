@@ -132,9 +132,23 @@ Tree > .tree--highlight {
     overflow: hidden;
 }
 
+#detail-top {
+    height: 1fr;
+    min-height: 0;
+    overflow: hidden;
+}
+
 #detail-meta {
+    width: 1fr;
     height: 1fr;
     padding: 0 1;
+}
+
+#detail-resources {
+    width: 28;
+    height: auto;
+    padding: 0 1;
+    border-left: solid #3e4451;
 }
 
 .detail-row {
@@ -157,6 +171,39 @@ Tree > .tree--highlight {
     height: auto;
     padding: 0 1;
     margin-top: 1;
+    background: transparent;
+    border: none;
+}
+
+#detail-command CollapsibleTitle {
+    height: auto;
+    color: #abb2bf;
+    text-style: bold;
+    padding: 0;
+    background: transparent;
+}
+
+#detail-command Contents {
+    height: auto;
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.resource-row {
+    height: auto;
+    margin: 0;
+}
+
+.resource-label {
+    width: 4;
+    color: #5c6370;
+    text-style: bold;
+}
+
+.resource-value {
+    width: 1fr;
+    color: #abb2bf;
 }
 
 .detail-section-title {
