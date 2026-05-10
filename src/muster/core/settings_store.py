@@ -83,6 +83,7 @@ def apply_to_app(app, settings: AppSettings) -> None:
         log_panel.auto_scroll = settings.log_auto_scroll
         log_panel.show_timestamp = settings.log_show_timestamp
         log_panel.buffer_lines = settings.log_buffer_lines
+        log_panel.load_history = settings.load_history_on_startup
         if log_panel._buffer.maxlen != settings.log_buffer_lines:
             old = list(log_panel._buffer)
             from collections import deque

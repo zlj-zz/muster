@@ -17,6 +17,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Input, Static, TextArea
 
+from ..core.orchestrator import load_today_logs
 from ..models import Service
 
 #: Regex patterns for parsing Go-style log levels.
@@ -37,6 +38,7 @@ _LEVEL_MAP: dict[str, str] = {
     "level-err": "ERROR",
     "level-warn": "WARN",
     "level-info": "INFO",
+    "level-debug": "DEBUG",
 }
 
 
@@ -56,6 +58,7 @@ class LogPanel(Vertical):
         self.auto_scroll: bool = True
         self.show_timestamp: bool = False
         self.buffer_lines: int = 2000
+        self.load_history: bool = False
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="log-level-row"):
@@ -63,6 +66,7 @@ class LogPanel(Vertical):
             yield Static("ERR", classes="log-level-btn", id="level-err")
             yield Static("WARN", classes="log-level-btn", id="level-warn")
             yield Static("INFO", classes="log-level-btn", id="level-info")
+            yield Static("DEBUG", classes="log-level-btn", id="level-debug")
         with Horizontal(id="log-search-row"):
             yield Static("❯ ", id="log-search-prefix")
             yield Input(
@@ -176,6 +180,10 @@ class LogPanel(Vertical):
 
         self._svc_name = svc.name
         self.border_title = f"Logs: {svc.name}"
+
+        if not svc.log_lines and self.load_history:
+            svc.log_lines = load_today_logs(svc.name, maxlen=self.buffer_lines)
+
         if svc.log_lines:
             self._buffer = deque(svc.log_lines, maxlen=self.buffer_lines)
             self._rebuild_display()

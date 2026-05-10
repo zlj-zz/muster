@@ -207,5 +207,6 @@ class AppSettings:
     log_show_timestamp: bool = False
     log_default_level: str = "ALL"
     log_buffer_lines: int = 2000
+    load_history_on_startup: bool = False
     health_timeout: int = 60
     stop_timeout: float = 8.0

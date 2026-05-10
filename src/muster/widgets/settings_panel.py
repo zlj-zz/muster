@@ -74,6 +74,7 @@ class SettingsPanel(VerticalScroll):
                         ("ERROR", "ERROR"),
                         ("WARN", "WARN"),
                         ("INFO", "INFO"),
+                        ("DEBUG", "DEBUG"),
                     ],
                     allow_blank=False,
                     classes="-textual-compact",
@@ -85,6 +86,13 @@ class SettingsPanel(VerticalScroll):
                 yield Input(
                     str(self.settings.log_buffer_lines),
                     id="input-buffer-lines",
+                )
+
+            with Horizontal(classes="settings-row"):
+                yield Static("Load history", classes="settings-label")
+                yield Switch(
+                    value=self.settings.load_history_on_startup,
+                    id="switch-load-history",
                 )
 
         # ── Timing ──
@@ -151,6 +159,9 @@ class SettingsPanel(VerticalScroll):
                 log_buffer_lines=int(
                     self.query_one("#input-buffer-lines", Input).value or "2000"
                 ),
+                load_history_on_startup=bool(
+                    self.query_one("#switch-load-history", Switch).value
+                ),
                 health_timeout=int(
                     self.query_one("#input-health-timeout", Input).value or "60"
                 ),
@@ -180,6 +191,9 @@ class SettingsPanel(VerticalScroll):
         self.query_one("#select-log-level", Select).value = defaults.log_default_level
         self.query_one("#input-buffer-lines", Input).value = str(
             defaults.log_buffer_lines
+        )
+        self.query_one("#switch-load-history", Switch).value = (
+            defaults.load_history_on_startup
         )
         self.query_one("#input-health-timeout", Input).value = str(
             defaults.health_timeout

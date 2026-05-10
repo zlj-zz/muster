@@ -158,3 +158,45 @@ class TestWaitProcess:
             await orch._wait_process(svc)
         # The CancelledError triggers the reaping path which calls wait() again
         assert svc.proc.wait.await_count >= 1
+
+
+class TestLoadTodayLogs:
+    """Lazy loading of historical disk logs."""
+
+    def test_loads_last_n_lines(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "muster.core.orchestrator._logfile_path",
+            lambda svc, now=None: tmp_path / f"{svc}.log",
+        )
+        logfile = tmp_path / "api.log"
+        logfile.write_text("\n".join(f"line {i}" for i in range(2500)), encoding="utf-8")
+
+        from muster.core.orchestrator import load_today_logs
+
+        lines = load_today_logs("api", maxlen=2000)
+        assert len(lines) == 2000
+        assert lines[0] == "line 500"
+        assert lines[-1] == "line 2499"
+
+    def test_missing_file_returns_empty(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "muster.core.orchestrator._logfile_path",
+            lambda svc, now=None: tmp_path / "missing.log",
+        )
+        from muster.core.orchestrator import load_today_logs
+
+        lines = load_today_logs("api")
+        assert len(lines) == 0
+
+    def test_decode_error_with_backslashreplace(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "muster.core.orchestrator._logfile_path",
+            lambda svc, now=None: tmp_path / f"{svc}.log",
+        )
+        logfile = tmp_path / "api.log"
+        logfile.write_bytes(b"hello \xff world\n")
+        from muster.core.orchestrator import load_today_logs
+
+        lines = load_today_logs("api")
+        assert len(lines) == 1
+        assert "\\xff" in lines[0]

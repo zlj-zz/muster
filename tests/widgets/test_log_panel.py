@@ -107,6 +107,20 @@ class TestLogPanelLevelFilter:
             assert "INFO hello" in text
             assert "ERROR broken" in text
 
+    async def test_level_filter_debug(self):
+        app = WidgetTestApp(LogPanel())
+        async with app.run_test() as pilot:
+            panel = app.query_one(LogPanel)
+            svc = Service(name="api", cmd="go run api.go", group="backend")
+            svc.log_lines = deque(["INFO hello", "DEBUG details", "ERROR broken"])
+            panel.set_service(svc)
+
+            panel._set_level("DEBUG")
+            text = panel._text_area.text
+            assert "DEBUG details" in text
+            assert "INFO hello" not in text
+            assert "ERROR broken" not in text
+
 
 class TestLogPanelSearch:
     """Search functionality."""
@@ -165,3 +179,60 @@ class TestLogPanelSearch:
             panel._do_search("foo")
             panel._previous_match()
             assert panel._match_idx == 1
+
+
+class TestLogPanelHistoricalLoad:
+    """Lazy disk log loading on set_service."""
+
+    async def test_loads_from_disk_when_empty_and_enabled(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "muster.core.orchestrator._logfile_path",
+            lambda svc, now=None: tmp_path / f"{svc}.log",
+        )
+        logfile = tmp_path / "api.log"
+        logfile.write_text("historical line 1\nhistorical line 2\n", encoding="utf-8")
+
+        app = WidgetTestApp(LogPanel())
+        async with app.run_test() as pilot:
+            panel = app.query_one(LogPanel)
+            panel.load_history = True
+            svc = Service(name="api", cmd="go run api.go", group="backend")
+            panel.set_service(svc)
+            assert "historical line 1" in panel._text_area.text
+            assert "historical line 2" in panel._text_area.text
+            assert len(panel._buffer) == 2
+
+    async def test_skips_disk_when_disabled(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "muster.core.orchestrator._logfile_path",
+            lambda svc, now=None: tmp_path / f"{svc}.log",
+        )
+        logfile = tmp_path / "api.log"
+        logfile.write_text("disk line\n", encoding="utf-8")
+
+        app = WidgetTestApp(LogPanel())
+        async with app.run_test() as pilot:
+            panel = app.query_one(LogPanel)
+            panel.load_history = False
+            svc = Service(name="api", cmd="go run api.go", group="backend")
+            panel.set_service(svc)
+            assert panel._text_area.text == ""
+            assert len(panel._buffer) == 0
+
+    async def test_skips_disk_when_already_loaded(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "muster.core.orchestrator._logfile_path",
+            lambda svc, now=None: tmp_path / f"{svc}.log",
+        )
+        logfile = tmp_path / "api.log"
+        logfile.write_text("disk line\n", encoding="utf-8")
+
+        app = WidgetTestApp(LogPanel())
+        async with app.run_test() as pilot:
+            panel = app.query_one(LogPanel)
+            panel.load_history = True
+            svc = Service(name="api", cmd="go run api.go", group="backend")
+            svc.log_lines.append("live line")
+            panel.set_service(svc)
+            assert "live line" in panel._text_area.text
+            assert "disk line" not in panel._text_area.text
