@@ -26,7 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Show zero resource bar for stopped services instead of dash
-- Replace `typing.Self` with class name for Python 3.10 compatibility
 - Graceful port cleanup and zombie process reaping
 - Friendlier error message when config file is missing
 

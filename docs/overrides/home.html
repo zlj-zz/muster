@@ -388,7 +388,7 @@
       <div class="mh-hero-left">
         <div class="mh-hero-badge">
           <span class="dot"></span>
-          <span>v0.5.0 — Now Available</span>
+          <span>v0.2.2 — Now Available</span>
         </div>
         <h1>A TUI dashboard<br><em>for local services</em></h1>
         <p class="mh-hero-desc">
@@ -421,10 +421,13 @@
         <div class="mh-terminal-body">
           <div class="mh-terminal-line">
             <span class="mh-terminal-prompt">$</span>
-            <span>pip install muster</span>
+            <span>gh repo view zlj-zz/muster</span>
           </div>
-          <div class="mh-terminal-output mh-terminal-success">Successfully installed muster-0.5.0</div>
-          <div class="mh-terminal-line">
+          <div class="mh-terminal-output" style="margin-top: 8px;">
+            A TUI-based service orchestrator for local development<br>
+            <span style="color: var(--ctp-blue);">https://github.com/zlj-zz/muster</span>
+          </div>
+          <div class="mh-terminal-line" style="margin-top: 12px;">
             <span class="mh-terminal-prompt">$</span>
             <span>muster -f muster-compose.yaml</span>
           </div>
@@ -521,7 +524,7 @@
     <section class="mh-install">
       <p class="mh-section-label">Installation</p>
       <h2 class="mh-section-title">One command away</h2>
-      <p class="mh-section-desc">Requires Python 3.10+. Install from PyPI and launch in seconds.</p>
+      <p class="mh-section-desc">Requires Python 3.10+. One-liner install from GitHub.</p>
 
       <div class="mh-install-code">
         <div class="mh-terminal-header">
@@ -530,14 +533,11 @@
           <span class="dot mh-dot-green"></span>
           <span>zsh</span>
         </div>
-        <pre><code><span class="mh-terminal-prompt">$</span> <span style="color: var(--ctp-text);">pip install muster</span>
-<span style="color: var(--ctp-green);">Successfully installed muster-0.5.0</span>
-
-<span class="mh-terminal-prompt">$</span> <span style="color: var(--ctp-text);">muster --version</span>
-muster 0.5.0
+        <pre><code><span class="mh-terminal-prompt">$</span> <span style="color: var(--ctp-text);">curl -fsSL https://raw.githubusercontent.com/zlj-zz/muster/main/install.sh | bash</span>
+<span style="color: var(--ctp-green);">muster installed: ~/.local/bin/muster</span>
 
 <span class="mh-terminal-prompt">$</span> <span style="color: var(--ctp-text);">muster -f muster-compose.yaml</span>
-<span style="color: var(--ctp-vibrant);">TUI dashboard running. Press 'q' to quit.</span></code></pre>
+<span style="color: var(--ctp-vibrant);">TUI dashboard running. Press '^q' to quit.</span></code></pre>
       </div>
     </section>
   </div>
