@@ -8,6 +8,7 @@ highlight, and level filtering.
 from __future__ import annotations
 
 import bisect
+import re
 import subprocess
 import sys
 from collections import deque
@@ -26,13 +27,36 @@ from textual.widgets import RichLog
 _LEVEL_COLORS: dict[str, str] = {
     "ERROR": "bold #e06c75",
     "WARN": "#e5c07b",
-    "INFO": "#98c379",
-    "DEBUG": "#5c6370",
+    "INFO": "#f0ead6",
+    "DEBUG": "#f0ead6",
     "SYS": "#61afef",
 }
 
 _ACTIVE_BG = "#636772"
 _ACTIVE_BG_STYLE = Style(bgcolor=_ACTIVE_BG)
+
+#: JSON syntax highlighting styles (Catppuccin Mocha palette).
+_JSON_STYLES: dict[str, str] = {
+    "key": "bold #b4befe",
+    "string": "#a6e3a1",
+    "bool": "#f9e2af",
+    "number": "#f5c2e7",
+    "punct": "#6c7086",
+}
+
+#: Token pattern for JSON syntax highlighting (keys, strings, bools/null, numbers, punctuation).
+_JSON_TOKEN_RE = re.compile(
+    r'"(?:\\.|[^"\\])*"(?=\s*:)|"(?:\\.|[^"\\])*"|\b(?:true|false|null)\b|-?\d+\.?\d*(?:[eE][+-]?\d+)?|[{}\[\]:,]'
+)
+
+
+def _is_json_like(text: str) -> bool:
+    """Fast O(1) heuristic: check if text looks like JSON (starts with `{` or `[`)."""
+    i = 0
+    n = len(text)
+    while i < n and text[i] in " \t\n\r":
+        i += 1
+    return n - i > 1 and text[i] in "{[" and text[-1] in "}]"
 
 
 def _copy_to_clipboard(text: str) -> None:
@@ -61,6 +85,7 @@ class _LineMeta:
     raw: str
     level: str
     line_no: int
+    is_json: bool = False
 
 
 class InteractiveRichLog(RichLog):
@@ -114,18 +139,22 @@ class InteractiveRichLog(RichLog):
         self.max_lines = maxlen
         self._rebuild()
 
-    def write_line(self, text: str, level: str | None = None) -> None:
-        """Append a single log line."""
+    def _make_meta(self, text: str, level: str | None = None) -> _LineMeta:
+        """Create a _LineMeta for *text*, inferring level if not provided."""
         level = level or self._line_parser(text)
         line_no = len(self._meta) + 1
-        self._meta.append(_LineMeta(text, level, line_no))
+        return _LineMeta(text, level, line_no, _is_json_like(text))
+
+    def write_line(self, text: str, level: str | None = None) -> None:
+        """Append a single log line."""
+        self._meta.append(self._make_meta(text, level))
 
         if len(self._meta) == self._meta.maxlen:
             # deque just dropped the oldest line; schedule a full rebuild.
             self._schedule_rebuild()
             return
 
-        if self._level_filter == "ALL" or level == self._level_filter:
+        if self._level_filter == "ALL" or self._meta[-1].level == self._level_filter:
             self.write(self._build_text(self._meta[-1]), scroll_end=False)
             if self.auto_scroll:
                 self.scroll_end(animate=False)
@@ -133,9 +162,7 @@ class InteractiveRichLog(RichLog):
     def write_lines(self, lines: list[str]) -> None:
         """Bulk append lines (used for historical log loading)."""
         for text in lines:
-            level = self._line_parser(text)
-            line_no = len(self._meta) + 1
-            self._meta.append(_LineMeta(text, level, line_no))
+            self._meta.append(self._make_meta(text))
         self._rebuild()
 
     def clear(self) -> InteractiveRichLog:  # type: ignore[override]
@@ -191,15 +218,54 @@ class InteractiveRichLog(RichLog):
     def _build_text(self, meta: _LineMeta) -> RichText:
         """Build a RichText with line number, level colour, and search highlight."""
         lineno = RichText(f"{meta.line_no:4d} │ ", style="dim")
-        content = RichText(meta.raw)
-        color = _LEVEL_COLORS.get(meta.level)
-        if color:
-            content.stylize(color)
+
+        if meta.is_json:
+            content = self._highlight_json(meta.raw)
+        else:
+            content = RichText(meta.raw)
+            color = _LEVEL_COLORS.get(meta.level)
+            if color:
+                content.stylize(color)
+
         if self._search_query:
             idx = meta.raw.find(self._search_query)
             if idx >= 0:
                 content.stylize("bold #eab459", idx, idx + len(self._search_query))
         return RichText.assemble(lineno, content)
+
+    def _highlight_json(self, text: str) -> RichText:
+        """Return a RichText with JSON syntax highlighting.
+
+        Uses a single-pass regex tokenizer.  Keys, strings, booleans/null,
+        numbers, and punctuation each get their own style.
+        """
+        result = RichText()
+        last_end = 0
+        for m in _JSON_TOKEN_RE.finditer(text):
+            start, end = m.span()
+            if start > last_end:
+                result.append(text[last_end:start], "default")
+
+            token = m.group()
+            if token.startswith('"'):
+                # key vs string: key is immediately followed by ':'
+                style = (
+                    _JSON_STYLES["key"]
+                    if text[end : end + 1].strip() == ":"
+                    else _JSON_STYLES["string"]
+                )
+            elif token in ("true", "false", "null"):
+                style = _JSON_STYLES["bool"]
+            elif token[0].isdigit() or token[0] == "-":
+                style = _JSON_STYLES["number"]
+            else:
+                style = _JSON_STYLES["punct"]
+            result.append(token, style)
+            last_end = end
+
+        if last_end < len(text):
+            result.append(text[last_end:], "default")
+        return result
 
     def _schedule_rebuild(self) -> None:
         if self._rebuild_scheduled:
