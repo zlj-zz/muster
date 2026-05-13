@@ -154,8 +154,11 @@ class InteractiveRichLog(RichLog):
             self._schedule_rebuild()
             return
 
-        if self._level_filter == "ALL" or self._meta[-1].level == self._level_filter:
-            self.write(self._build_text(self._meta[-1]), scroll_end=False)
+        meta = self._meta[-1]
+        if self._level_filter == "ALL" or meta.level == self._level_filter:
+            self._visible_meta_indices.append(len(self._meta) - 1)
+            self._line_to_screen.append(len(self.lines))
+            self.write(self._build_text(meta), scroll_end=False)
             if self.auto_scroll:
                 self.scroll_end(animate=False)
 
