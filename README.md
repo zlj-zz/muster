@@ -17,6 +17,8 @@ muster -f muster-compose.yaml
 - **Dependency-aware startup** — auto-resolves and starts dependencies in the correct order
 - **Real-time logs** — per-service logs with auto-scroll and copy support
 - **Health checks** — TCP, HTTP, and process checks with latency measurement
+- **Runtime health checks** — automatically detects crashed services and marks them `FAILED`
+- **JSON syntax highlighting** — pretty-printed and colourised JSON in service logs
 - **Environment monitoring** — live indicators for etcd, MySQL, Redis, or any custom dependency
 - **Multiple command modes** — each service can define `default`, `test`, `prod`, or any custom command map
 - **Port auto-discovery** — extract listening ports from your service config files
