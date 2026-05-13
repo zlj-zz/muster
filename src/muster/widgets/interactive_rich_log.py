@@ -35,13 +35,13 @@ _LEVEL_COLORS: dict[str, str] = {
 _ACTIVE_BG = "#636772"
 _ACTIVE_BG_STYLE = Style(bgcolor=_ACTIVE_BG)
 
-#: JSON syntax highlighting styles (Catppuccin Mocha palette).
+#: JSON syntax highlighting styles (Claude Code CLI palette).
 _JSON_STYLES: dict[str, str] = {
-    "key": "bold #b4befe",
-    "string": "#a6e3a1",
-    "bool": "#f9e2af",
-    "number": "#f5c2e7",
-    "punct": "#6c7086",
+    "key": "bold #61afef",
+    "string": "#98c379",
+    "bool": "#d19a66",
+    "number": "#c678dd",
+    "punct": "#abb2bf",
 }
 
 #: Token pattern for JSON syntax highlighting (keys, strings, bools/null, numbers, punctuation).
