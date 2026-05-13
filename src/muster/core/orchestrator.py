@@ -17,10 +17,12 @@ from pathlib import Path
 from collections.abc import Callable
 
 from ..models import MusterConfig, Service, Status
+from .env import check_tcp
 from .process import kill_port_owner
 from .resolver import resolve_dependencies, resolve_port
 
 _LOG_RETENTION_DAYS = 7
+_RUNTIME_HEALTH_INTERVAL = 30.0
 
 #: Valid status transitions.  stop() may force any transition.
 _VALID_TRANSITIONS: dict[Status, set[Status]] = {
@@ -106,6 +108,7 @@ class ServiceOrchestrator:
         self._health_tasks: dict[str, asyncio.Task] = {}
         self._monitor_tasks: dict[str, asyncio.Task] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self._runtime_health_task: asyncio.Task | None = None
 
     # ---------- internal helpers ----------
 
@@ -134,6 +137,13 @@ class ServiceOrchestrator:
     def _notify(self, msg: str, severity: str = "information") -> None:
         """Forward a notification to the UI callback."""
         self._on_notify(msg, severity)
+
+    def _resolve_effective_port(self, svc: Service) -> int | None:
+        """Return the TCP port to use for health checks, or ``None``.
+
+        Prefers ``svc.port`` if already known, otherwise resolves via config.
+        """
+        return svc.port or resolve_port(svc.name, self.config.port_discovery)
 
     def _abort_start(
         self, target: Service, dep: Service, is_target: bool, reason: str
@@ -297,6 +307,10 @@ class ServiceOrchestrator:
             )
             self._health_tasks[svc.name] = asyncio.create_task(self._wait_process(svc))
             self._monitor_tasks[svc.name] = asyncio.create_task(self._health_check(svc))
+            if self._runtime_health_task is None or self._runtime_health_task.done():
+                self._runtime_health_task = asyncio.create_task(
+                    self._runtime_health_loop()
+                )
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -329,6 +343,13 @@ class ServiceOrchestrator:
             task = task_dict.pop(svc.name, None)
             if task:
                 task.cancel()
+
+        # Cancel the global runtime health loop only when no services remain.
+        if self._runtime_health_task and not any(
+            s.status in (Status.STARTING, Status.RUNNING) for s in self.registry.values()
+        ):
+            self._runtime_health_task.cancel()
+            self._runtime_health_task = None
 
         if svc.proc and svc.proc.returncode is None:
             try:
@@ -421,6 +442,8 @@ class ServiceOrchestrator:
             + list(self._health_tasks.values())
             + list(self._monitor_tasks.values())
         )
+        if self._runtime_health_task:
+            tasks.append(self._runtime_health_task)
         for task in tasks:
             task.cancel()
         if tasks:
@@ -509,7 +532,7 @@ class ServiceOrchestrator:
             svc: Service to health-check.
         """
         try:
-            port = svc.port or resolve_port(svc.name, self.config.port_discovery)
+            port = self._resolve_effective_port(svc)
             if port is None:
                 await asyncio.sleep(3)
                 async with self._get_lock(svc.name):
@@ -554,3 +577,57 @@ class ServiceOrchestrator:
             async with self._get_lock(svc.name):
                 self._set_status(svc, Status.FAILED)
             self._notify(f"{svc.name} health check error: {e}", "error")
+
+    async def _runtime_health_loop(self) -> None:
+        """Periodically check TCP connectivity for all RUNNING services."""
+        while True:
+            try:
+                await asyncio.sleep(_RUNTIME_HEALTH_INTERVAL)
+            except asyncio.CancelledError:
+                return
+
+            running = [
+                (svc, port)
+                for svc in self.registry.values()
+                if svc.status == Status.RUNNING
+                and (port := self._resolve_effective_port(svc)) is not None
+            ]
+            if not running:
+                continue
+
+            results = await asyncio.gather(
+                *[
+                    asyncio.to_thread(check_tcp, "127.0.0.1", port)
+                    for _, port in running
+                ],
+                return_exceptions=True,
+            )
+
+            for (svc, port), result in zip(running, results):
+                if isinstance(result, Exception):
+                    err_msg = f"muster▸Runtime health check error: {result}"
+                    svc.log_lines.append(err_msg)
+                    self._log(svc.name, err_msg)
+                    continue
+                ok, _latency = result
+                if ok:
+                    ok_msg = f"muster▸Health check ok (port {port})"
+                    svc.log_lines.append(ok_msg)
+                    self._log(svc.name, ok_msg)
+                    continue
+                async with self._get_lock(svc.name):
+                    if svc.status != Status.RUNNING:
+                        continue
+                    svc.last_error = (
+                        f"runtime health check failed (port {port})"
+                    )
+                    self._set_status(svc, Status.FAILED)
+                msg = (
+                    f"muster▸Runtime health check failed (port {port}),"
+                    " marking FAILED"
+                )
+                svc.log_lines.append(msg)
+                self._log(svc.name, msg)
+                self._notify(
+                    f"{svc.name} health check failed", "error"
+                )
