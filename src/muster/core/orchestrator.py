@@ -161,6 +161,38 @@ class ServiceOrchestrator:
         self._log(target.name, f"muster▸{msg}")
         self._notify(msg, "error")
 
+    def _compute_depth_layers(self, deps: list[Service]) -> list[list[Service]]:
+        """Group services by dependency depth for parallel launch.
+
+        Depth 0 = no dependencies. Depth N = all direct dependencies
+        have depth <= N-1, and at least one has depth N-1.
+        """
+        depth_map: dict[str, int] = {}
+
+        def depth(svc: Service) -> int:
+            if svc.name in depth_map:
+                return depth_map[svc.name]
+            if not svc.depends_on:
+                depth_map[svc.name] = 0
+                return 0
+            # depth = 1 + max(depth of all dependencies)
+            d = 1 + max(
+                depth(self.registry[dep]) for dep in svc.depends_on
+                if dep in self.registry
+            )
+            depth_map[svc.name] = d
+            return d
+
+        for svc in deps:
+            depth(svc)
+
+        # Group by depth
+        max_depth = max(depth_map.values()) if depth_map else -1
+        layers: list[list[Service]] = [[] for _ in range(max_depth + 1)]
+        for svc in deps:
+            layers[depth_map[svc.name]].append(svc)
+        return layers
+
     # ---------- public API ----------
 
     async def start_with_deps(self, svc: Service, mode: str = "default") -> None:
@@ -190,15 +222,14 @@ class ServiceOrchestrator:
         if port and not await self._check_port_conflict(svc.name, port):
             return
 
-        # Build launch plan: one layer per group, ordered by group.order.
-        order_map = {g.id: g.order for g in self.config.groups}
-        layers = sorted(set(d.group for d in deps), key=lambda g: order_map.get(g, 999))
-        self._log(svc.name, f"muster▸Groups: {layers}")
+        # Build launch plan: one layer per dependency depth.
+        layers = self._compute_depth_layers(deps)
+        layer_names = [[s.name for s in layer] for layer in layers]
+        self._log(svc.name, f"muster▸Launch layers: {layer_names}")
 
-        for layer in layers:
-            layer_svcs = [d for d in deps if d.group == layer]
+        for layer_idx, layer_svcs in enumerate(layers):
             layer_names = [s.name for s in layer_svcs]
-            self._log(svc.name, f"muster▸Starting [{layer}] group: {layer_names}")
+            self._log(svc.name, f"muster▸Starting layer {layer_idx}: {layer_names}")
 
             # Kick off every service in this layer that is not already running.
             for s in layer_svcs:
