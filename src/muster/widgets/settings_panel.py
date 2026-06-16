@@ -140,12 +140,12 @@ class SettingsPanel(VerticalScroll):
 
             with Horizontal(classes="settings-row"):
                 yield SettingsLabel(
-                    "Health timeout",
-                    "Seconds to wait for a service port to become ready",
+                    "Start timeout",
+                    "等待服务就绪的秒数（健康检查 + 层等待）",
                 )
                 yield Input(
-                    str(self.settings.health_timeout),
-                    id="input-health-timeout",
+                    str(self.settings.start_timeout),
+                    id="input-start-timeout",
                 )
                 yield Static("s", classes="settings-unit")
 
@@ -208,8 +208,8 @@ class SettingsPanel(VerticalScroll):
                 load_history_on_startup=bool(
                     self.query_one("#switch-load-history", Switch).value
                 ),
-                health_timeout=int(
-                    self.query_one("#input-health-timeout", Input).value or "60"
+                start_timeout=int(
+                    self.query_one("#input-start-timeout", Input).value or "60"
                 ),
                 stop_timeout=float(
                     self.query_one("#input-stop-timeout", Input).value or "8"
@@ -242,8 +242,8 @@ class SettingsPanel(VerticalScroll):
         self.query_one("#switch-load-history", Switch).value = (
             defaults.load_history_on_startup
         )
-        self.query_one("#input-health-timeout", Input).value = str(
-            defaults.health_timeout
+        self.query_one("#input-start-timeout", Input).value = str(
+            defaults.start_timeout
         )
         self.query_one("#input-stop-timeout", Input).value = str(defaults.stop_timeout)
         self.settings = defaults

@@ -102,7 +102,7 @@ class ServiceOrchestrator:
         self._on_status = on_status
         self._on_notify = on_notify
         self.stop_timeout: float = 8.0
-        self.health_timeout: int = 60
+        self.start_timeout: int = 60
         self.port_conflict_strategy: str = "kill"
         self._reader_tasks: dict[str, asyncio.Task] = {}
         self._health_tasks: dict[str, asyncio.Task] = {}
@@ -263,7 +263,7 @@ class ServiceOrchestrator:
                     svc.name,
                     f"muster▸Waiting for {s.name} ready (current: {s.status.value})...",
                 )
-                for _ in range(180):
+                for _ in range(int(self.start_timeout / 0.5)):
                     if s.status == Status.RUNNING:
                         self._log(svc.name, f"muster▸{s.name} ready")
                         break
@@ -272,7 +272,7 @@ class ServiceOrchestrator:
                         return
                     await asyncio.sleep(0.5)
                 if s.status != Status.RUNNING:
-                    self._abort_start(svc, s, is_target, "start timeout (90s)")
+                    self._abort_start(svc, s, is_target, f"start timeout ({self.start_timeout}s)")
                     return
 
     async def start(self, svc: Service, mode: str = "default") -> None:
@@ -573,7 +573,7 @@ class ServiceOrchestrator:
                         self._set_status(svc, Status.FAILED)
                 return
 
-            for i in range(self.health_timeout):
+            for i in range(self.start_timeout):
                 async with self._get_lock(svc.name):
                     if svc.proc is None or svc.proc.returncode is not None:
                         self._set_status(svc, Status.FAILED)

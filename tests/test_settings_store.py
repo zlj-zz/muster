@@ -39,7 +39,7 @@ class TestLoadSettings:
         assert settings.env_refresh_interval == 10
         assert settings.log_auto_scroll is False
         # Missing keys fall back to defaults
-        assert settings.health_timeout == 60
+        assert settings.start_timeout == 60
 
     def test_load_corrupt_file_returns_defaults(self, tmp_path, monkeypatch):
         custom = tmp_path / "settings.json"
@@ -87,13 +87,13 @@ class TestApplyToApp:
 
         settings = AppSettings(
             stop_timeout=12.0,
-            health_timeout=90,
+            start_timeout=90,
             port_conflict_strategy="warn",
         )
         apply_to_app(app, settings)
 
         assert app._orchestrator.stop_timeout == 12.0
-        assert app._orchestrator.health_timeout == 90
+        assert app._orchestrator.start_timeout == 90
         assert app._orchestrator.port_conflict_strategy == "warn"
 
     def test_restarts_env_timer_on_interval_change(self):
