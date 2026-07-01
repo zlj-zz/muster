@@ -84,6 +84,6 @@ class TestAppSettingsTimeouts:
 
     def test_app_settings_has_separate_timeouts(self):
         settings = AppSettings()
-        assert settings.health_timeout == 60
+        assert settings.health_timeout == 120
         assert settings.layer_timeout == 120
-        assert settings.layer_timeout > settings.health_timeout
+        assert settings.layer_timeout >= settings.health_timeout

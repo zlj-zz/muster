@@ -102,7 +102,7 @@ class ServiceOrchestrator:
         self._on_status = on_status
         self._on_notify = on_notify
         self.stop_timeout: float = 8.0
-        self.health_timeout: int = 60
+        self.health_timeout: int = 120
         self.layer_timeout: int = 120
         self.port_conflict_strategy: str = "kill"
         self._reader_tasks: dict[str, asyncio.Task] = {}
@@ -251,11 +251,16 @@ class ServiceOrchestrator:
                         f"muster▸Skipping start: {s.name} (status: {s.status.value})",
                     )
 
-            # Wait for the whole layer to reach a terminal state.
+            # Wait for the whole layer to reach a terminal state in parallel.
+            # Each service has its own ready event; waiting serially would
+            # multiply the timeout by the layer size, so we gather them.
+            layer_waiters: list[tuple[Service, asyncio.Task]] = []
             for s in layer_svcs:
                 is_target = s.name == svc.name
                 if s.status == Status.RUNNING:
-                    self._log(svc.name, f"muster▸{s.name} already running, skip wait")
+                    self._log(
+                        svc.name, f"muster▸{s.name} already running, skip wait"
+                    )
                     continue
                 if s.status == Status.FAILED:
                     self._abort_start(svc, s, is_target, "start failed")
@@ -265,20 +270,37 @@ class ServiceOrchestrator:
                     svc.name,
                     f"muster▸Waiting for {s.name} ready (current: {s.status.value})...",
                 )
-                try:
-                    await asyncio.wait_for(
+                waiter = asyncio.create_task(
+                    asyncio.wait_for(
                         s._ready_event.wait(), timeout=self.layer_timeout
                     )
-                except asyncio.TimeoutError:
-                    self._abort_start(
-                        svc, s, is_target, f"start timeout ({self.layer_timeout}s)"
-                    )
-                    return
+                )
+                layer_waiters.append((s, waiter))
 
-                if s.status == Status.FAILED:
-                    self._abort_start(svc, s, is_target, "start failed")
-                    return
-                self._log(svc.name, f"muster▸{s.name} ready")
+            if layer_waiters:
+                results = await asyncio.gather(
+                    *[task for _, task in layer_waiters], return_exceptions=True
+                )
+                for (s, _), result in zip(layer_waiters, results):
+                    is_target = s.name == svc.name
+                    if isinstance(result, asyncio.TimeoutError):
+                        self._abort_start(
+                            svc,
+                            s,
+                            is_target,
+                            f"start timeout ({self.layer_timeout}s)",
+                        )
+                        return
+                    if s.status == Status.FAILED:
+                        self._abort_start(svc, s, is_target, "start failed")
+                        return
+                    elapsed = (
+                        datetime.now() - s.start_time
+                    ).total_seconds() if s.start_time else 0.0
+                    self._log(
+                        svc.name,
+                        f"muster▸{s.name} ready (startup took {elapsed:.1f}s)",
+                    )
 
     async def start(self, svc: Service, mode: str = "default") -> None:
         """Start a single service process.

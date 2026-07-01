@@ -39,7 +39,8 @@ class TestLoadSettings:
         assert settings.env_refresh_interval == 10
         assert settings.log_auto_scroll is False
         # Missing keys fall back to defaults
-        assert settings.health_timeout == 60
+        assert settings.health_timeout == 120
+        assert settings.layer_timeout == 120
         assert settings.layer_timeout == 120
 
     def test_load_corrupt_file_returns_defaults(self, tmp_path, monkeypatch):

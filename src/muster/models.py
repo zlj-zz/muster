@@ -217,6 +217,6 @@ class AppSettings:
     log_default_level: str = "ALL"
     log_buffer_lines: int = 2000
     load_history_on_startup: bool = False
-    health_timeout: int = 60
+    health_timeout: int = 120
     layer_timeout: int = 120
     stop_timeout: float = 8.0
