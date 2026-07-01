@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from muster.core.orchestrator import ServiceOrchestrator
-from muster.models import MusterConfig, PortDiscovery, Service, Status
+from muster.models import AppSettings, MusterConfig, PortDiscovery, Service, Status
 
 
 def _make_orchestrator(registry: dict[str, Service]) -> ServiceOrchestrator:
@@ -26,6 +26,14 @@ def _make_orchestrator(registry: dict[str, Service]) -> ServiceOrchestrator:
         on_status=lambda _s: None,
         on_notify=lambda _m, _s: None,
     )
+
+
+class TestOrchestratorTimeouts:
+    """Health and layer timeout configuration."""
+
+    def test_orchestrator_has_separate_timeouts(self):
+        orch = _make_orchestrator({})
+        assert orch.health_timeout < orch.layer_timeout
 
 
 class TestOrchestratorStart:

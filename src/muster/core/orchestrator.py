@@ -102,7 +102,8 @@ class ServiceOrchestrator:
         self._on_status = on_status
         self._on_notify = on_notify
         self.stop_timeout: float = 8.0
-        self.start_timeout: int = 60
+        self.health_timeout: int = 60
+        self.layer_timeout: int = 120
         self.port_conflict_strategy: str = "kill"
         self._reader_tasks: dict[str, asyncio.Task] = {}
         self._health_tasks: dict[str, asyncio.Task] = {}
@@ -198,9 +199,9 @@ class ServiceOrchestrator:
     async def start_with_deps(self, svc: Service, mode: str = "default") -> None:
         """Start a service after resolving and starting all dependencies.
 
-        Dependencies are launched layer-by-layer (group order).  Within each
-        layer, services are started in parallel; the caller then waits for the
-        entire layer to become ``RUNNING`` before proceeding to the next layer.
+        Dependencies are launched layer-by-layer. Within each layer, services
+        are started in parallel; the caller waits for the entire layer to
+        reach a terminal state before proceeding to the next layer.
 
         If any dependency fails or times out, the start sequence is aborted.
 
@@ -253,27 +254,31 @@ class ServiceOrchestrator:
             # Wait for the whole layer to reach a terminal state.
             for s in layer_svcs:
                 is_target = s.name == svc.name
-                if s.status in (Status.RUNNING, Status.FAILED):
-                    if s.status == Status.FAILED:
-                        self._abort_start(svc, s, is_target, "start failed")
-                        return
+                if s.status == Status.RUNNING:
                     self._log(svc.name, f"muster▸{s.name} already running, skip wait")
                     continue
+                if s.status == Status.FAILED:
+                    self._abort_start(svc, s, is_target, "start failed")
+                    return
+
                 self._log(
                     svc.name,
                     f"muster▸Waiting for {s.name} ready (current: {s.status.value})...",
                 )
-                for _ in range(int(self.start_timeout / 0.5)):
-                    if s.status == Status.RUNNING:
-                        self._log(svc.name, f"muster▸{s.name} ready")
-                        break
-                    if s.status == Status.FAILED:
-                        self._abort_start(svc, s, is_target, "start failed")
-                        return
-                    await asyncio.sleep(0.5)
-                if s.status != Status.RUNNING:
-                    self._abort_start(svc, s, is_target, f"start timeout ({self.start_timeout}s)")
+                try:
+                    await asyncio.wait_for(
+                        s._ready_event.wait(), timeout=self.layer_timeout
+                    )
+                except asyncio.TimeoutError:
+                    self._abort_start(
+                        svc, s, is_target, f"start timeout ({self.layer_timeout}s)"
+                    )
                     return
+
+                if s.status == Status.FAILED:
+                    self._abort_start(svc, s, is_target, "start failed")
+                    return
+                self._log(svc.name, f"muster▸{s.name} ready")
 
     async def start(self, svc: Service, mode: str = "default") -> None:
         """Start a single service process.
@@ -289,6 +294,7 @@ class ServiceOrchestrator:
         async with self._get_lock(svc.name):
             if svc.status in (Status.STARTING, Status.RUNNING):
                 return
+            svc._ready_event.clear()
             self._set_status(svc, Status.STARTING)
         self._notify(f"Starting {svc.name}...", "information")
 
@@ -404,6 +410,7 @@ class ServiceOrchestrator:
         svc.start_time = None
         async with self._get_lock(svc.name):
             self._set_status(svc, Status.STOPPED, force=True)
+        svc._ready_event.clear()
         stopped_msg = "muster▸Service stopped"
         svc.log_lines.append(stopped_msg)
         self._log(svc.name, stopped_msg)
@@ -557,7 +564,8 @@ class ServiceOrchestrator:
         If the service has no discoverable port, falls back to a 3-second
         heuristic: if the process is still alive, mark it ``RUNNING``.
 
-        Times out after 60 seconds and marks the service ``FAILED``.
+        Times out after ``self.health_timeout`` seconds and marks the service
+        ``FAILED``.
 
         Args:
             svc: Service to health-check.
@@ -571,21 +579,24 @@ class ServiceOrchestrator:
                         self._set_status(svc, Status.RUNNING)
                     else:
                         self._set_status(svc, Status.FAILED)
+                svc._ready_event.set()
                 return
 
-            for i in range(self.start_timeout):
+            for i in range(self.health_timeout):
                 async with self._get_lock(svc.name):
                     if svc.proc is None or svc.proc.returncode is not None:
                         self._set_status(svc, Status.FAILED)
                 # Lock released — check whether we already set FAILED.
                 if svc.status == Status.FAILED:
                     self._log(svc.name, "muster▸Process exited, health check failed")
+                    svc._ready_event.set()
                     return
                 try:
                     with socket.create_connection(("127.0.0.1", port), timeout=1.0):
                         async with self._get_lock(svc.name):
                             self._set_status(svc, Status.RUNNING)
                         svc.port = port
+                        svc._ready_event.set()
                         self._log(svc.name, f"muster▸Service ready (port {port})")
                         self._notify(f"{svc.name} ready (:{port})", "success")
                         return
@@ -599,6 +610,7 @@ class ServiceOrchestrator:
 
             async with self._get_lock(svc.name):
                 self._set_status(svc, Status.FAILED)
+            svc._ready_event.set()
             self._log(svc.name, f"muster▸Port {port} not ready, health check timeout")
             self._notify(f"{svc.name} port {port} not ready", "error")
         except Exception as e:
@@ -607,6 +619,7 @@ class ServiceOrchestrator:
             self._log(svc.name, err)
             async with self._get_lock(svc.name):
                 self._set_status(svc, Status.FAILED)
+            svc._ready_event.set()
             self._notify(f"{svc.name} health check error: {e}", "error")
 
     async def _runtime_health_loop(self) -> None:
