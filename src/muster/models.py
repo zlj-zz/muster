@@ -130,6 +130,9 @@ class Service:
     start_time: datetime | None = None
     restart_count: int = 0
     last_error: str | None = None
+    _ready_event: asyncio.Event = field(
+        default_factory=asyncio.Event, repr=False, compare=False
+    )
 
     def cmd_for(self, mode: str) -> str:
         """Return the command string for the given mode.

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from muster.models import Service, Status
@@ -66,3 +68,12 @@ class TestServiceDefaults:
     def test_default_port_is_none(self):
         svc = Service(name="api", cmd="go run main.go", group="backend")
         assert svc.port is None
+
+
+class TestServiceReadyEvent:
+    """Service._ready_event for async readiness notification."""
+
+    def test_service_has_ready_event(self):
+        svc = Service(name="api", cmd="go run main.go", group="backend")
+        assert isinstance(svc._ready_event, asyncio.Event)
+        assert not svc._ready_event.is_set()
