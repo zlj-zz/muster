@@ -100,6 +100,14 @@ class MusterApp(App):
         self._resource_timer = None
         self._yaml_files = self._scan_yaml_files()
         self._stop_pending = False
+        # Cached widget references populated in on_mount to avoid repeated
+        # expensive query_one calls on the hot log/status callback paths.
+        self._log_panel: LogPanel | None = None
+        self._service_tree: ServiceTree | None = None
+        self._detail_panel: DetailPanel | None = None
+        # UI-side log batching buffer (flushed every 50ms).
+        self._pending_log_lines: dict[str, list[str]] = {}
+        self._log_flush_timer = None
 
     def _scan_yaml_files(self) -> list[str]:
         """Scan for YAML files in the config directory."""
@@ -183,6 +191,11 @@ class MusterApp(App):
         Auto-selects the first item in each tab so that panels are
         never empty on startup.
         """
+        # Cache expensive widget lookups once.
+        self._log_panel = self.query_one("#log", LogPanel)
+        self._service_tree = self.query_one("#service-tree", ServiceTree)
+        self._detail_panel = self.query_one("#detail", DetailPanel)
+
         self.title = "muster"
         self._refresh_env_status()
         self._env_timer = self.set_interval(
@@ -192,7 +205,7 @@ class MusterApp(App):
         apply_to_app(self, self._settings)
 
         # svc tab: auto-select first service
-        tree = self.query_one("#service-tree", ServiceTree)
+        tree = self._service_tree
         if tree.services:
             for group_node in tree.root.children:
                 if group_node.children:
@@ -225,21 +238,32 @@ class MusterApp(App):
         return " | ".join(parts)
 
     def _safe_append_log(self, svc_name: str, line: str) -> None:
-        """Append a log line, swallowing widget lookup errors.
+        """Append a log line with UI-side batching.
 
-        Called from background tasks; the log panel may not exist during
-        shutdown.
+        Buffers lines for 50ms so high-frequency logs are rendered in one
+        UI refresh instead of one per line.
 
         Args:
             svc_name: Name of the service that produced the line.
-            line: Raw log text.
+            line: Raw log line text.
         """
-        from textual.css.query import NoMatches
+        log_panel = self._log_panel
+        if log_panel is None or log_panel._svc_name != svc_name:
+            return
 
-        try:
-            self.query_one("#log", LogPanel).append_log(svc_name, line)
-        except NoMatches:
-            pass
+        self._pending_log_lines.setdefault(svc_name, []).append(line)
+        if self._log_flush_timer is None:
+            self._log_flush_timer = self.set_timer(0.05, self._flush_pending_logs)
+
+    def _flush_pending_logs(self) -> None:
+        """Flush buffered log lines to the log panel in a single update."""
+        self._log_flush_timer = None
+        pending = self._pending_log_lines
+        self._pending_log_lines = {}
+        for svc_name, lines in pending.items():
+            log_panel = self._log_panel
+            if log_panel is not None and log_panel._svc_name == svc_name:
+                log_panel.append_logs(svc_name, lines)
 
     def _filtered_services(self) -> list[Service]:
         """Return services matching the current group filter.
@@ -254,7 +278,9 @@ class MusterApp(App):
 
     def _refresh_tree(self) -> None:
         """Rebuild the service tree and restore the previous selection."""
-        tree = self.query_one("#service-tree", ServiceTree)
+        tree = self._service_tree
+        if tree is None:
+            return
         current_name = tree.current_service.name if tree.current_service else None
         tree.services = self._filtered_services()
         tree.rebuild()
@@ -274,13 +300,14 @@ class MusterApp(App):
         from textual.css.query import NoMatches
 
         try:
-            tree = self.query_one("#service-tree", ServiceTree)
+            tree = self._service_tree
+            if tree is None:
+                return
             svc = tree.current_service
-            self.query_one("#detail", DetailPanel).current_service = svc
-            try:
-                self.query_one("#log", LogPanel).set_service(svc)
-            except NoMatches:
-                pass
+            if self._detail_panel is not None:
+                self._detail_panel.current_service = svc
+            if self._log_panel is not None:
+                self._log_panel.set_service(svc)
         except NoMatches:
             pass
 
@@ -364,15 +391,14 @@ class MusterApp(App):
         Args:
             svc: Service whose visual representation should be refreshed.
         """
-        from textual.css.query import NoMatches
-
         try:
-            tree = self.query_one("#service-tree", ServiceTree)
-            tree.refresh_node(svc)
-            detail = self.query_one("#detail", DetailPanel)
-            if detail.current_service is svc:
-                detail.refresh_content()
-        except (NoMatches, AttributeError):
+            tree = self._service_tree
+            if tree is not None:
+                tree.refresh_node(svc)
+            detail = self._detail_panel
+            if detail is not None and detail.current_service is svc:
+                detail.refresh_status(svc)
+        except AttributeError:
             pass
 
     # ---------- event handlers ----------

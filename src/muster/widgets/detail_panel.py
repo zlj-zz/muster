@@ -152,6 +152,34 @@ class DetailPanel(Static):
         self._render_detail(self.current_service)
         self._update_buttons(self.current_service)
 
+    def refresh_status(self, svc: Service | None) -> None:
+        """Re-render only status-dependent parts (status text + buttons).
+
+        Called on every service status change; avoids rebuilding the entire
+        detail panel and command syntax block.
+
+        Args:
+            svc: Service whose status changed.
+        """
+        if svc is None or svc is not self.current_service:
+            return
+        self._update_status_row(svc)
+        self._update_buttons(svc)
+
+    def _update_status_row(self, svc: Service) -> None:
+        """Update only the status row and status colour without full rebuild."""
+        rows = self._cached_rows
+        if not rows:
+            rows = list(self.query(".detail-row").results(Horizontal))
+            self._cached_rows = rows
+        if not rows:
+            return
+
+        status_color = self._status_colors.get(svc.status.value, "#cccccc")
+        # Status row is the third metadata row (index 2).
+        value_widget = rows[2].query_one(".detail-value", Static)
+        value_widget.update(Text(svc.status.value, style=f"bold {status_color}"))
+
     def _render_detail(self, svc: Service | None) -> None:
         """Build and display the key/value metadata block.
 

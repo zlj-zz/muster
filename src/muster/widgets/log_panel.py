@@ -183,6 +183,20 @@ class LogPanel(Vertical):
             line = f"{datetime.now().strftime('%H:%M:%S')} {line}"
         self._log_widget.write_line(line)
 
+    def append_logs(self, svc_name: str, lines: list[str]) -> None:
+        """Append multiple log lines in a single UI refresh.
+
+        Args:
+            svc_name: Name of the service that produced the lines.
+            lines: Raw log line texts.
+        """
+        if self._svc_name != svc_name or not lines:
+            return
+        if self.show_timestamp:
+            ts = datetime.now().strftime("%H:%M:%S")
+            lines = [f"{ts} {line}" for line in lines]
+        self._log_widget.write_lines(lines)
+
     @on(Input.Changed, "#log-search")
     def on_search_changed(self, event: Input.Changed) -> None:
         self._search_dirty = True

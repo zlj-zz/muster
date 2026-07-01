@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from muster.models import Status
+import asyncio
+from unittest.mock import patch
+
+from muster.models import AppSettings, Status
 from muster.widgets.detail_panel import DetailPanel
 from muster.widgets.log_panel import LogPanel
 from muster.widgets.service_tree import ServiceTree
+from muster.widgets.settings_panel import SettingsPanel
 from tests.conftest import capture_messages
 
 
@@ -235,3 +239,115 @@ class TestAppMount:
             text = mode.render()
             assert "DEFAULT" in str(text)
             assert "ALL" in str(text)
+
+
+class TestAppWidgetCache:
+    """Widget references are cached after mount."""
+
+    async def test_log_panel_cached_after_mount(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app._log_panel is not None
+            assert app._service_tree is not None
+            assert app._detail_panel is not None
+
+
+class TestAppLogBatching:
+    """High-frequency log lines are batched into a single UI update."""
+
+    async def test_log_lines_are_batched_within_timer_window(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            tree = app.query_one("#service-tree", ServiceTree)
+            tree.highlight_service("api")
+            await pilot.pause()
+            app._update_detail()
+            await pilot.pause()
+
+            log_panel = app._log_panel
+            log_panel.append_logs = lambda svc_name, lines: setattr(
+                log_panel, "_batched_calls", getattr(log_panel, "_batched_calls", 0) + 1
+            )
+
+            for i in range(10):
+                app._safe_append_log("api", f"line {i}")
+
+            await asyncio.sleep(0.06)
+            assert getattr(log_panel, "_batched_calls", 0) == 1
+
+    async def test_safe_append_log_ignores_hidden_service(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            tree = app.query_one("#service-tree", ServiceTree)
+            tree.highlight_service("api")
+            await pilot.pause()
+            app._update_detail()
+            await pilot.pause()
+
+            app._safe_append_log("web", "should be ignored")
+            assert app._pending_log_lines == {}
+
+
+class TestAppSettings:
+    """Settings change handling."""
+
+    async def test_settings_unchanged_does_not_save(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            settings_panel = app.query_one("#right-settings", SettingsPanel)
+            with patch("muster.core.settings_store.save_settings") as mock_save:
+                settings_panel.post_message(
+                    SettingsPanel.SettingsChanged(app._settings)
+                )
+                await pilot.pause()
+                mock_save.assert_not_called()
+
+    async def test_settings_changed_applies_and_saves(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            settings_panel = app.query_one("#right-settings", SettingsPanel)
+            new_settings = AppSettings(env_refresh_interval=10)
+            with patch("muster.core.settings_store.save_settings") as mock_save:
+                settings_panel.post_message(
+                    SettingsPanel.SettingsChanged(new_settings)
+                )
+                await pilot.pause()
+                assert app._settings.env_refresh_interval == 10
+                mock_save.assert_called_once()
+
+
+class TestAppMisc:
+    """Miscellaneous helper methods and edge cases."""
+
+    def test_scan_yaml_files(self, minimal_config, tmp_path):
+        yaml_file = tmp_path / "muster-compose.yaml"
+        yaml_file.write_text("services: []\n", encoding="utf-8")
+        from muster.app import MusterApp
+
+        registry = {}
+        app = MusterApp(
+            config=minimal_config,
+            services=[],
+            registry=registry,
+            config_path=yaml_file,
+        )
+        assert "muster-compose.yaml" in app._scan_yaml_files()
+
+    def test_common_cmd_modes_empty_services(self, minimal_config):
+        from muster.app import MusterApp
+
+        app = MusterApp(
+            config=minimal_config,
+            services=[],
+            registry={},
+        )
+        assert app._common_cmd_modes == ["default"]
+
+    async def test_refresh_resources_no_proc(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            tree = app.query_one("#service-tree", ServiceTree)
+            tree.highlight_service("api")
+            await pilot.pause()
+            await app._refresh_resources()

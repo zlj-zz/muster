@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from textual.containers import Horizontal
 from textual.widgets import Button, Static
 
 from muster.models import Group, Service, Status
@@ -185,3 +186,29 @@ class TestDetailPanelResources:
 
             cpu = panel.query_one("#res-cpu", Static)
             assert expected_color in str(cpu.content.spans)
+
+
+class TestDetailPanelIncrementalRefresh:
+    """Status changes update only the status row, not the whole panel."""
+
+    async def test_refresh_status_updates_only_status_row(self, detail_panel):
+        app = WidgetTestApp(detail_panel)
+        async with app.run_test() as pilot:
+            panel = app.query_one(DetailPanel)
+            svc = Service(name="api", cmd="go run api.go", group="backend")
+            panel.current_service = svc
+            await pilot.pause()
+
+            code_widget = panel.query_one(".detail-code", Static)
+            original_command_text = code_widget.content.code
+
+            svc.status = Status.RUNNING
+            panel.refresh_status(svc)
+            await pilot.pause()
+
+            new_command_text = code_widget.content.code
+            assert original_command_text == new_command_text
+
+            rows = list(panel.query(".detail-row").results(Horizontal))
+            status_value = rows[2].query_one(".detail-value", Static)
+            assert Status.RUNNING.value in status_value.content.plain

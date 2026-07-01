@@ -82,6 +82,25 @@ class TestLogPanelAppend:
             assert "should not appear" not in _meta_text(panel)
 
 
+class TestLogPanelBatchAppend:
+    """Bulk log line appending."""
+
+    async def test_append_logs_batches_into_single_write(self):
+        app = WidgetTestApp(LogPanel())
+        async with app.run_test() as pilot:
+            panel = app.query_one(LogPanel)
+            svc = Service(name="svc", cmd="go run api.go", group="backend")
+            panel.set_service(svc)
+            await pilot.pause()
+
+            panel.append_logs("svc", [f"line {i}" for i in range(10)])
+            await pilot.pause()
+
+            text = _meta_text(panel)
+            for i in range(10):
+                assert f"line {i}" in text
+
+
 class TestLogPanelLevelFilter:
     """Filtering by log level."""
 
