@@ -204,7 +204,8 @@ class AppSettings:
         log_default_level: Default log-level filter (``"ALL"``, ``"ERROR"``,
             ``"WARN"``, ``"INFO"``).
         log_buffer_lines: Maximum number of log lines to keep in memory.
-        start_timeout: Seconds to wait for a service to become ready (health check + layer wait).
+        health_timeout: Seconds to wait for a single service port to become ready.
+        layer_timeout: Seconds to wait for an entire dependency layer to become ready.
         stop_timeout: Seconds to wait for graceful shutdown before SIGKILL.
     """
 
@@ -216,5 +217,6 @@ class AppSettings:
     log_default_level: str = "ALL"
     log_buffer_lines: int = 2000
     load_history_on_startup: bool = False
-    start_timeout: int = 60
+    health_timeout: int = 60
+    layer_timeout: int = 120
     stop_timeout: float = 8.0

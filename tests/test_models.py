@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from muster.models import Service, Status
+from muster.models import AppSettings, Service, Status
 
 
 class TestServiceCmdFor:
@@ -77,3 +77,13 @@ class TestServiceReadyEvent:
         svc = Service(name="api", cmd="go run main.go", group="backend")
         assert isinstance(svc._ready_event, asyncio.Event)
         assert not svc._ready_event.is_set()
+
+
+class TestAppSettingsTimeouts:
+    """AppSettings timeout defaults."""
+
+    def test_app_settings_has_separate_timeouts(self):
+        settings = AppSettings()
+        assert settings.health_timeout == 60
+        assert settings.layer_timeout == 120
+        assert settings.layer_timeout > settings.health_timeout
