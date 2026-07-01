@@ -30,9 +30,11 @@ def load_settings() -> AppSettings:
     except (json.JSONDecodeError, OSError):
         return AppSettings()
 
-    # Migrate legacy field name (health_timeout -> start_timeout)
-    if "health_timeout" in data and "start_timeout" not in data:
-        data["start_timeout"] = data.pop("health_timeout")
+    # Migrate legacy unified timeout field into separate timeouts.
+    if "start_timeout" in data:
+        start_timeout = data.pop("start_timeout")
+        data.setdefault("health_timeout", start_timeout)
+        data.setdefault("layer_timeout", max(start_timeout * 2, 120))
 
     # Merge with defaults so new fields are back-filled.
     merged = AppSettings().__dict__.copy()
@@ -72,7 +74,8 @@ def apply_to_app(app, settings: AppSettings) -> None:
     """
     # Update orchestrator
     app._orchestrator.stop_timeout = settings.stop_timeout
-    app._orchestrator.start_timeout = settings.start_timeout
+    app._orchestrator.health_timeout = settings.health_timeout
+    app._orchestrator.layer_timeout = settings.layer_timeout
     app._orchestrator.port_conflict_strategy = settings.port_conflict_strategy
 
     # Update log panel

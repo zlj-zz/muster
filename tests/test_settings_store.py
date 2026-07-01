@@ -39,7 +39,8 @@ class TestLoadSettings:
         assert settings.env_refresh_interval == 10
         assert settings.log_auto_scroll is False
         # Missing keys fall back to defaults
-        assert settings.start_timeout == 60
+        assert settings.health_timeout == 60
+        assert settings.layer_timeout == 120
 
     def test_load_corrupt_file_returns_defaults(self, tmp_path, monkeypatch):
         custom = tmp_path / "settings.json"
@@ -60,6 +61,16 @@ class TestLoadSettings:
 
         settings = load_settings()
         assert settings.env_refresh_interval == 10
+
+    def test_load_migrates_start_timeout(self, tmp_path, monkeypatch):
+        """Legacy unified start_timeout is migrated to health/layer timeouts."""
+        custom = tmp_path / "settings.json"
+        custom.write_text(json.dumps({"start_timeout": 60}), encoding="utf-8")
+        monkeypatch.setattr("muster.core.settings_store._SETTINGS_FILE", custom)
+
+        settings = load_settings()
+        assert settings.health_timeout == 60
+        assert settings.layer_timeout == 120
 
 
 class TestSaveSettings:
@@ -87,13 +98,15 @@ class TestApplyToApp:
 
         settings = AppSettings(
             stop_timeout=12.0,
-            start_timeout=90,
+            health_timeout=90,
+            layer_timeout=180,
             port_conflict_strategy="warn",
         )
         apply_to_app(app, settings)
 
         assert app._orchestrator.stop_timeout == 12.0
-        assert app._orchestrator.start_timeout == 90
+        assert app._orchestrator.health_timeout == 90
+        assert app._orchestrator.layer_timeout == 180
         assert app._orchestrator.port_conflict_strategy == "warn"
 
     def test_restarts_env_timer_on_interval_change(self):

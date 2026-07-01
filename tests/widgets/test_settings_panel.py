@@ -18,7 +18,8 @@ class TestSettingsPanel:
             log_show_timestamp=True,
             log_default_level="ERROR",
             log_buffer_lines=500,
-            start_timeout=45,
+            health_timeout=45,
+            layer_timeout=90,
             stop_timeout=3.5,
         )
         panel = SettingsPanel(settings)
@@ -29,7 +30,8 @@ class TestSettingsPanel:
             # Numeric inputs
             assert app.query_one("#input-env-interval").value == "10"
             assert app.query_one("#input-buffer-lines").value == "500"
-            assert app.query_one("#input-start-timeout").value == "45"
+            assert app.query_one("#input-health-timeout").value == "45"
+            assert app.query_one("#input-layer-timeout").value == "90"
             assert app.query_one("#input-stop-timeout").value == "3.5"
 
             # Selects
