@@ -33,8 +33,8 @@ class TestOrchestratorTimeouts:
 
     def test_orchestrator_has_separate_timeouts(self):
         orch = _make_orchestrator({})
-        assert orch.health_timeout == 120
-        assert orch.layer_timeout == 120
+        assert orch.health_timeout == 300
+        assert orch.layer_timeout == 300
         assert orch.layer_timeout >= orch.health_timeout
 
 

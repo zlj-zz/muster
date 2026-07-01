@@ -36,6 +36,13 @@ def load_settings() -> AppSettings:
         data.setdefault("health_timeout", start_timeout)
         data.setdefault("layer_timeout", max(start_timeout * 2, 120))
 
+    # Raise unreasonably short timeouts saved by older versions so that
+    # compile-heavy go-zero services do not falsely fail on first start.
+    if data.get("health_timeout", 300) <= 120:
+        data["health_timeout"] = 300
+    if data.get("layer_timeout", 300) <= 120:
+        data["layer_timeout"] = 300
+
     # Merge with defaults so new fields are back-filled.
     merged = AppSettings().__dict__.copy()
     merged.update(data)

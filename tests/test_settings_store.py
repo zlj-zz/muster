@@ -39,9 +39,8 @@ class TestLoadSettings:
         assert settings.env_refresh_interval == 10
         assert settings.log_auto_scroll is False
         # Missing keys fall back to defaults
-        assert settings.health_timeout == 120
-        assert settings.layer_timeout == 120
-        assert settings.layer_timeout == 120
+        assert settings.health_timeout == 300
+        assert settings.layer_timeout == 300
 
     def test_load_corrupt_file_returns_defaults(self, tmp_path, monkeypatch):
         custom = tmp_path / "settings.json"
@@ -70,8 +69,8 @@ class TestLoadSettings:
         monkeypatch.setattr("muster.core.settings_store._SETTINGS_FILE", custom)
 
         settings = load_settings()
-        assert settings.health_timeout == 60
-        assert settings.layer_timeout == 120
+        assert settings.health_timeout == 300
+        assert settings.layer_timeout == 300
 
 
 class TestSaveSettings:

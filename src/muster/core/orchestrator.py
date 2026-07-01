@@ -102,8 +102,8 @@ class ServiceOrchestrator:
         self._on_status = on_status
         self._on_notify = on_notify
         self.stop_timeout: float = 8.0
-        self.health_timeout: int = 120
-        self.layer_timeout: int = 120
+        self.health_timeout: int = 300
+        self.layer_timeout: int = 300
         self.port_conflict_strategy: str = "kill"
         self._reader_tasks: dict[str, asyncio.Task] = {}
         self._health_tasks: dict[str, asyncio.Task] = {}
@@ -254,6 +254,10 @@ class ServiceOrchestrator:
             # Wait for the whole layer to reach a terminal state in parallel.
             # Each service has its own ready event; waiting serially would
             # multiply the timeout by the layer size, so we gather them.
+            self._log(
+                svc.name,
+                f"muster▸Waiting for layer {layer_idx} to become ready (timeout: {self.layer_timeout}s)...",
+            )
             layer_waiters: list[tuple[Service, asyncio.Task]] = []
             for s in layer_svcs:
                 is_target = s.name == svc.name
@@ -595,6 +599,10 @@ class ServiceOrchestrator:
         try:
             port = self._resolve_effective_port(svc)
             if port is None:
+                self._log(
+                    svc.name,
+                    "muster▸No discoverable port, using process liveness heuristic",
+                )
                 await asyncio.sleep(3)
                 async with self._get_lock(svc.name):
                     if svc.proc and svc.proc.returncode is None:
@@ -603,6 +611,11 @@ class ServiceOrchestrator:
                         self._set_status(svc, Status.FAILED)
                 svc._ready_event.set()
                 return
+
+            self._log(
+                svc.name,
+                f"muster▸Health check started for port {port} (timeout: {self.health_timeout}s)",
+            )
 
             for i in range(self.health_timeout):
                 async with self._get_lock(svc.name):
