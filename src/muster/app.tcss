@@ -436,8 +436,13 @@ Tree, TextArea, VerticalScroll, DataTable, RichLog {
     background: #3e4451;
     color: #abb2bf;
     padding: 0 2;
-    border-left: thick #eab459;
+    border-left: thick #5c6370;
     content-align: center middle;
+}
+
+#footer-mode.mode-active {
+    background: #3a3224;
+    border-left: thick #eab459;
 }
 
 /* ========== Settings Panel ========== */

@@ -197,6 +197,7 @@ class MusterApp(App):
         self._detail_panel = self.query_one("#detail", DetailPanel)
 
         self.title = "muster"
+        self._update_mode_badge()
         self._refresh_env_status()
         self._env_timer = self.set_interval(
             self._settings.env_refresh_interval, self._refresh_env_status
@@ -228,14 +229,41 @@ class MusterApp(App):
             self._update_yaml_preview()
 
     def _mode_label(self) -> str:
-        """Build the subtitle string shown in the mode badge.
+        """Build Rich markup for the footer mode badge.
 
         Returns:
-            String like ``"DEFAULT | ALL"`` or ``"TEST | DOMAIN"``.
+            Markup like ``"MODE DEFAULT | GROUP ALL"``; non-default mode
+            is highlighted so the current profile is always obvious.
         """
-        parts = [self.cmd_mode.upper()]
-        parts.append(self._group_filter.upper() if self._group_filter else "ALL")
-        return " | ".join(parts)
+        mode = self.cmd_mode.upper()
+        group = self._group_filter.upper() if self._group_filter else "ALL"
+        if self.cmd_mode == "default":
+            mode_markup = f"[bold #abb2bf]{mode}[/]"
+        else:
+            mode_markup = f"[bold #eab459]{mode}[/]"
+        return (
+            f"[dim]MODE[/] {mode_markup}"
+            f"  [dim]|[/]  "
+            f"[dim]GROUP[/] [bold #abb2bf]{group}[/]"
+        )
+
+    def _update_mode_badge(self) -> None:
+        """Refresh the footer mode badge immediately.
+
+        Decoupled from env-check polling so switching mode/group always
+        updates the UI even when dependency checks fail.
+        """
+        from textual.css.query import NoMatches
+
+        try:
+            badge = self.query_one("#footer-mode", Static)
+            badge.update(self._mode_label())
+            if self.cmd_mode == "default":
+                badge.remove_class("mode-active")
+            else:
+                badge.add_class("mode-active")
+        except NoMatches:
+            pass
 
     def _safe_append_log(self, svc_name: str, line: str) -> None:
         """Append a log line with UI-side batching.
@@ -353,7 +381,6 @@ class MusterApp(App):
             detail = self.query_one("#right-env", EnvDetailPanel)
             if detail.current_env is not None:
                 detail.refresh_content()
-            self.query_one("#footer-mode", Static).update(self._mode_label())
         except NoMatches:
             pass
 
@@ -529,7 +556,7 @@ class MusterApp(App):
             return
         idx = modes.index(self.cmd_mode) if self.cmd_mode in modes else 0
         self.cmd_mode = modes[(idx + 1) % len(modes)]
-        self._refresh_env_status()
+        self._update_mode_badge()
         self.notify(f"Mode: {self.cmd_mode.upper()}", severity="information")
 
     def action_cycle_group(self) -> None:
@@ -538,6 +565,7 @@ class MusterApp(App):
         idx = group_ids.index(self._group_filter)
         self._group_filter = group_ids[(idx + 1) % len(group_ids)]
         label = self._group_filter.upper() if self._group_filter else "ALL"
+        self._update_mode_badge()
         self.notify(f"Group filter: {label}", severity="information")
         self._refresh_tree()
 

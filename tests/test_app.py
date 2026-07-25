@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from muster.models import AppSettings, Status
+from muster.models import AppSettings, Service, Status
 from muster.widgets.detail_panel import DetailPanel
 from muster.widgets.log_panel import LogPanel
 from muster.widgets.service_tree import ServiceTree
@@ -173,6 +173,61 @@ class TestAppCycleMode:
             # but the action still runs
             assert app.cmd_mode == initial
 
+    async def test_cycle_cmd_mode_updates_footer_badge(self, minimal_config):
+        """Switching mode immediately refreshes the footer badge."""
+        from muster.app import MusterApp
+
+        services = [
+            Service(
+                name="api",
+                cmd={"default": "go run api.go", "test": "go run api.go -f test.yaml"},
+                group="backend",
+                port=8080,
+            ),
+            Service(
+                name="web",
+                cmd={"default": "npm run dev", "test": "npm run test"},
+                group="frontend",
+                port=3000,
+            ),
+        ]
+        registry = {s.name: s for s in services}
+        app = MusterApp(config=minimal_config, services=services, registry=registry)
+        app._orchestrator = MagicMock()
+        app._orchestrator.stop_all = AsyncMock()
+        app._orchestrator.cleanup = AsyncMock()
+        app._orchestrator.start_with_deps = AsyncMock()
+        app._orchestrator.stop = AsyncMock()
+        app._orchestrator.restart = AsyncMock()
+
+        async with app.run_test() as pilot:
+            badge = app.query_one("#footer-mode")
+            assert "DEFAULT" in str(badge.render())
+            assert "mode-active" not in badge.classes
+
+            await pilot.press("t")
+            await pilot.pause()
+
+            assert app.cmd_mode == "test"
+            assert "TEST" in str(badge.render())
+            assert "mode-active" in badge.classes
+
+            await pilot.press("t")
+            await pilot.pause()
+            assert app.cmd_mode == "default"
+            assert "DEFAULT" in str(badge.render())
+            assert "mode-active" not in badge.classes
+
+    async def test_cycle_group_updates_footer_badge(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            badge = app.query_one("#footer-mode")
+            await pilot.press("l")
+            await pilot.pause()
+            assert app._group_filter == "backend"
+            assert "BACKEND" in str(badge.render())
+            assert "GROUP" in str(badge.render())
+
 
 class TestAppCycleGroup:
     """l key cycles group filter."""
@@ -237,7 +292,9 @@ class TestAppMount:
         async with app.run_test() as pilot:
             mode = app.query_one("#footer-mode")
             text = mode.render()
+            assert "MODE" in str(text)
             assert "DEFAULT" in str(text)
+            assert "GROUP" in str(text)
             assert "ALL" in str(text)
 
 
