@@ -6,6 +6,7 @@ from .env_detail_panel import EnvDetailPanel
 from .env_indicator import EnvIndicator
 from .env_list import EnvList
 from .file_list import FileList
+from .help_overlay import HelpOverlay
 from .interactive_rich_log import InteractiveRichLog
 from .log_panel import LogPanel
 from .service_tree import ServiceTree
@@ -21,6 +22,7 @@ __all__ = [
     "EnvIndicator",
     "EnvList",
     "FileList",
+    "HelpOverlay",
     "InteractiveRichLog",
     "LogPanel",
     "ServiceTree",

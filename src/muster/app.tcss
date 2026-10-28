@@ -551,3 +551,16 @@ SelectOverlay > .option-list--option {
 #settings-actions Button {
     margin: 0 1 0 0;
 }
+
+HelpOverlay {
+    align: center middle;
+    background: #000000cc;
+}
+
+#help-body {
+    width: 64;
+    max-height: 24;
+    border: round #eab459;
+    background: #282c34;
+    padding: 1 2;
+}

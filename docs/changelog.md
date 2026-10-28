@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-28
+
+### Added
+- `?` help overlay listing every keybinding (including hidden ones: `1/2/3/4`,
+  `j/k`), opened via `?` and closed with `?` or `esc`; footer now shows a
+  `? help` hint
+- Real-subprocess integration tests covering layered dependency startup,
+  fast-fail propagation on spawn errors, and port release after stop
+  (orchestrator coverage 49% → 73%)
+
 ## [0.2.3] - 2026-10-28
 
 ### Fixed

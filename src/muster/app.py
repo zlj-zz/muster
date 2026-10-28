@@ -31,6 +31,7 @@ from .widgets import (
     EnvIndicator,
     EnvList,
     FileList,
+    HelpOverlay,
     LogPanel,
     ServiceTree,
     SettingsPanel,
@@ -69,6 +70,7 @@ class MusterApp(App):
         Binding("4", "switch_tab('settings')", "Settings", show=False),
         Binding("j,down", "cursor_down", "Down", show=False),
         Binding("k,up", "cursor_up", "Up", show=False),
+        Binding("question_mark", "help", "Help", show=False),
     ]
 
     def __init__(
@@ -182,7 +184,8 @@ class MusterApp(App):
             "[#eab459]enter[/] toggle  "
             "[#eab459]R[/] restart  "
             "[#eab459]t[/] mode  "
-            "[#eab459]l[/] filter"
+            "[#eab459]l[/] filter  "
+            "[#eab459]?[/] help"
         )
 
     def on_mount(self) -> None:
@@ -583,6 +586,10 @@ class MusterApp(App):
     def action_refresh_env(self) -> None:
         """Manually trigger an environment status refresh."""
         self.run_worker(self._refresh_env_status())
+
+    def action_help(self) -> None:
+        """Show the keyboard shortcut overlay."""
+        self.push_screen(HelpOverlay(list(type(self).BINDINGS)))
 
     async def action_quit(self) -> None:
         """Gracefully shut down before exiting the application."""
