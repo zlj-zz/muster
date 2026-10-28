@@ -15,8 +15,8 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Input, Static
 
-from ..core.orchestrator import load_today_logs
-from ..models import Service
+from ..core.logstore import load_today_logs
+from ..models import AppSettings, Service
 from .interactive_rich_log import InteractiveRichLog
 
 #: Regex patterns for parsing Go-style log levels.
@@ -100,6 +100,22 @@ class LogPanel(Vertical):
     def resize_buffer(self, maxlen: int) -> None:
         """Delegate buffer resize to the underlying log widget."""
         self._log_widget.resize_buffer(maxlen)
+
+    def apply_settings(self, settings: AppSettings) -> None:
+        """Apply user preferences to the panel.
+
+        Args:
+            settings: The settings to apply.
+        """
+        self.auto_scroll = settings.log_auto_scroll
+        self.show_timestamp = settings.log_show_timestamp
+        self.wrap = settings.log_wrap
+        self.buffer_lines = settings.log_buffer_lines
+        self.load_history = settings.load_history_on_startup
+        self.set_wrap(settings.log_wrap)
+        self.resize_buffer(settings.log_buffer_lines)
+        if self._log_level == "ALL":
+            self._set_level(settings.log_default_level)
 
     def _update_search_count(self) -> None:
         """Refresh the match counter badge in the search row."""

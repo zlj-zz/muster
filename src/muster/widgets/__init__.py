@@ -11,7 +11,6 @@ from .interactive_rich_log import InteractiveRichLog
 from .log_panel import LogPanel
 from .service_tree import ServiceTree
 from .settings_panel import SettingsPanel
-from .status_bar import StatusBar
 from .yaml_preview import YamlPreview
 
 __all__ = [
@@ -27,6 +26,5 @@ __all__ = [
     "LogPanel",
     "ServiceTree",
     "SettingsPanel",
-    "StatusBar",
     "YamlPreview",
 ]

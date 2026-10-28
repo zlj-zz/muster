@@ -11,17 +11,15 @@ import asyncio
 import os
 import signal
 import socket
-from collections import deque
 from datetime import datetime
-from pathlib import Path
 from collections.abc import Callable
 
 from ..models import MusterConfig, Service, Status
 from .env import check_tcp
+from .logstore import _cleanup_old_logs, _logfile_path
 from .process import kill_port_owner
 from .resolver import resolve_dependencies, resolve_port
 
-_LOG_RETENTION_DAYS = 7
 _RUNTIME_HEALTH_INTERVAL = 30.0
 
 #: Valid status transitions.  stop() may force any transition.
@@ -31,46 +29,6 @@ _VALID_TRANSITIONS: dict[Status, set[Status]] = {
     Status.RUNNING: {Status.STOPPED, Status.FAILED},
     Status.FAILED: {Status.STARTING, Status.STOPPED},
 }
-
-
-def _logfile_path(svc_name: str, now: datetime | None = None) -> Path:
-    today = (now or datetime.now()).strftime("%Y-%m-%d")
-    return Path("muster_logs") / svc_name / f"{today}.log"
-
-
-def _cleanup_old_logs(svc_name: str) -> None:
-    """Remove log files older than ``_LOG_RETENTION_DAYS`` for a service."""
-    log_dir = Path("muster_logs") / svc_name
-    cutoff = datetime.now().timestamp() - _LOG_RETENTION_DAYS * 86400
-    for f in log_dir.glob("*.log"):
-        if f.stat().st_mtime < cutoff:
-            f.unlink()
-
-
-def load_today_logs(svc_name: str, maxlen: int = 2000) -> deque[str]:
-    """Load the last *maxlen* lines from today's on-disk log file.
-
-    Called lazily when a service is first viewed in the TUI after a restart.
-    If the file does not exist or cannot be read, returns an empty deque.
-
-    Args:
-        svc_name: Name of the service whose logs to load.
-        maxlen: Maximum number of lines to retain (matches ``Service.log_lines``).
-
-    Returns:
-        A deque containing up to *maxlen* lines from the log file.
-    """
-    logfile = _logfile_path(svc_name)
-    try:
-        with open(logfile, "r", encoding="utf-8", errors="backslashreplace") as f:
-            # Use a plain loop instead of a generator so the deque eviction
-            # is inlined and avoids the generator protocol overhead.
-            lines: deque[str] = deque(maxlen=maxlen)
-            for ln in f:
-                lines.append(ln.rstrip("\n\r"))
-            return lines
-    except OSError:
-        return deque(maxlen=maxlen)
 
 
 class ServiceOrchestrator:
@@ -131,6 +89,12 @@ class ServiceOrchestrator:
         if not force:
             valid_next = _VALID_TRANSITIONS.get(svc.status, set())
             if status not in valid_next:
+                # Surface dropped transitions instead of failing silently.
+                self._log(
+                    svc.name,
+                    f"muster▸Ignored invalid transition "
+                    f"{svc.status.value} -> {status.value}",
+                )
                 return
         svc.status = status
         self._on_status(svc)
@@ -454,10 +418,13 @@ class ServiceOrchestrator:
             ``True`` if it is safe to proceed, ``False`` if the start should abort.
         """
         try:
-            with socket.create_connection(("127.0.0.1", port), timeout=1.0):
-                pass  # port is occupied
+            # Blocking probe — keep it off the event loop.
+            sock = await asyncio.to_thread(
+                socket.create_connection, ("127.0.0.1", port), timeout=1.0
+            )
         except OSError:
             return True  # port is free
+        sock.close()  # port is occupied
 
         label = f"Dep {dep_name} " if dep_name else ""
         msg = f"{label}port {port} in use"
@@ -625,16 +592,20 @@ class ServiceOrchestrator:
                     svc._ready_event.set()
                     return
                 try:
-                    with socket.create_connection(("127.0.0.1", port), timeout=1.0):
-                        async with self._get_lock(svc.name):
-                            self._set_status(svc, Status.RUNNING)
-                        svc.port = port
-                        svc._ready_event.set()
-                        self._log(svc.name, f"muster▸Service ready (port {port})")
-                        self._notify(f"{svc.name} ready (:{port})", "success")
-                        return
+                    sock = await asyncio.to_thread(
+                        socket.create_connection, ("127.0.0.1", port), timeout=1.0
+                    )
                 except OSError:
                     pass
+                else:
+                    sock.close()
+                    async with self._get_lock(svc.name):
+                        self._set_status(svc, Status.RUNNING)
+                    svc.port = port
+                    svc._ready_event.set()
+                    self._log(svc.name, f"muster▸Service ready (port {port})")
+                    self._notify(f"{svc.name} ready (:{port})", "success")
+                    return
                 if i % 5 == 0:
                     self._log(
                         svc.name, f"muster▸Waiting for port {port} ready... ({i}s)"

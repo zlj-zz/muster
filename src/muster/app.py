@@ -21,8 +21,8 @@ from textual.widgets import ContentSwitcher, Static
 from .core.env import check_env
 from .core.orchestrator import ServiceOrchestrator
 from .core.process import get_cpu_memory_percent
-from .core.settings_store import apply_to_app, load_settings
-from .models import Group, MusterConfig, Service, Status
+from .core.settings_store import load_settings
+from .models import AppSettings, Group, MusterConfig, Service, Status
 from .widgets import (
     ActivityBar,
     ActivityTab,
@@ -37,6 +37,11 @@ from .widgets import (
     SettingsPanel,
     YamlPreview,
 )
+
+
+#: Accent for footer/mode markup. Markup spans cannot be styled from
+#: app.tcss, so the value lives here as a single named constant.
+_ACCENT = "#eab459"
 
 
 class MusterApp(App):
@@ -178,15 +183,49 @@ class MusterApp(App):
     def _footer_text(self) -> str:
         """Build the footer shortcut hint text with Rich markup."""
         return (
-            "[#eab459]^q[/] quit  "
-            "[#eab459]^s[/] stop-all  "
-            "[#eab459]r[/] refresh  "
-            "[#eab459]enter[/] toggle  "
-            "[#eab459]R[/] restart  "
-            "[#eab459]t[/] mode  "
-            "[#eab459]l[/] filter  "
-            "[#eab459]?[/] help"
+            f"[{_ACCENT}]^q[/] quit  "
+            f"[{_ACCENT}]^s[/] stop-all  "
+            f"[{_ACCENT}]r[/] refresh  "
+            f"[{_ACCENT}]enter[/] toggle  "
+            f"[{_ACCENT}]R[/] restart  "
+            f"[{_ACCENT}]t[/] mode  "
+            f"[{_ACCENT}]l[/] filter  "
+            f"[{_ACCENT}]?[/] help"
         )
+
+    def apply_settings(self, settings: AppSettings) -> None:
+        """Apply user settings to the running app.
+
+        Updates orchestrator parameters, log panel behaviour, and
+        re-schedules the env refresh timer when the interval changes.
+
+        Args:
+            settings: The settings to apply.
+        """
+        orch = self._orchestrator
+        orch.stop_timeout = settings.stop_timeout
+        orch.health_timeout = settings.health_timeout
+        orch.layer_timeout = settings.layer_timeout
+        orch.port_conflict_strategy = settings.port_conflict_strategy
+
+        from textual.css.query import NoMatches
+
+        try:
+            self.query_one("#log", LogPanel).apply_settings(settings)
+        except NoMatches:
+            pass
+
+        # Re-schedule the env refresh timer only when the interval changed.
+        old_interval = getattr(
+            self, "_env_refresh_interval", settings.env_refresh_interval
+        )
+        if old_interval != settings.env_refresh_interval:
+            self._env_refresh_interval = settings.env_refresh_interval
+            if self._env_timer is not None:
+                self._env_timer.stop()
+            self._env_timer = self.set_interval(
+                settings.env_refresh_interval, self._refresh_env_status
+            )
 
     def on_mount(self) -> None:
         """Initialise the UI after widgets are mounted.
@@ -206,7 +245,7 @@ class MusterApp(App):
             self._settings.env_refresh_interval, self._refresh_env_status
         )
         self._resource_timer = self.set_interval(2, self._refresh_resources)
-        apply_to_app(self, self._settings)
+        self.apply_settings(self._settings)
 
         # svc tab: auto-select first service
         tree = self._service_tree
@@ -243,7 +282,7 @@ class MusterApp(App):
         if self.cmd_mode == "default":
             mode_markup = f"[bold #abb2bf]{mode}[/]"
         else:
-            mode_markup = f"[bold #eab459]{mode}[/]"
+            mode_markup = f"[bold {_ACCENT}]{mode}[/]"
         return (
             f"[dim]MODE[/] {mode_markup}"
             f"  [dim]|[/]  "
@@ -479,7 +518,7 @@ class MusterApp(App):
         if event.settings == self._settings:
             return
         self._settings = event.settings
-        apply_to_app(self, self._settings)
+        self.apply_settings(self._settings)
         save_settings(self._settings)
         self.notify("Settings saved", severity="success")
 

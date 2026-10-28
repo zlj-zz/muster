@@ -8,9 +8,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from muster.app import MusterApp
 from muster.core.settings_store import (
     _SETTINGS_FILE,
-    apply_to_app,
     load_settings,
     save_settings,
 )
@@ -72,6 +72,32 @@ class TestLoadSettings:
         assert settings.health_timeout == 300
         assert settings.layer_timeout == 300
 
+    def test_legacy_migration_respects_good_values(self, tmp_path, monkeypatch):
+        """Legacy migration must not rewrite already-reasonable timeouts."""
+        custom = tmp_path / "settings.json"
+        custom.write_text(
+            json.dumps({"start_timeout": 240, "health_timeout": 240}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr("muster.core.settings_store._SETTINGS_FILE", custom)
+
+        settings = load_settings()
+        assert settings.health_timeout == 240
+        assert settings.layer_timeout == 480  # max(240*2, 120)
+
+    def test_no_legacy_key_respects_saved_timeouts(self, tmp_path, monkeypatch):
+        """User-saved short timeouts are no longer silently rewritten."""
+        custom = tmp_path / "settings.json"
+        custom.write_text(
+            json.dumps({"health_timeout": 60, "layer_timeout": 90}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr("muster.core.settings_store._SETTINGS_FILE", custom)
+
+        settings = load_settings()
+        assert settings.health_timeout == 60
+        assert settings.layer_timeout == 90
+
 
 class TestSaveSettings:
     """Writing settings to disk."""
@@ -102,7 +128,7 @@ class TestApplyToApp:
             layer_timeout=180,
             port_conflict_strategy="warn",
         )
-        apply_to_app(app, settings)
+        MusterApp.apply_settings(app, settings)
 
         assert app._orchestrator.stop_timeout == 12.0
         assert app._orchestrator.health_timeout == 90
@@ -118,7 +144,7 @@ class TestApplyToApp:
         app._env_timer = old_timer
 
         settings = AppSettings(env_refresh_interval=10)
-        apply_to_app(app, settings)
+        MusterApp.apply_settings(app, settings)
 
         old_timer.stop.assert_called_once()
         app.set_interval.assert_called_once_with(10, app._refresh_env_status)
@@ -132,7 +158,7 @@ class TestApplyToApp:
         app._env_timer = MagicMock()
 
         settings = AppSettings(env_refresh_interval=5)
-        apply_to_app(app, settings)
+        MusterApp.apply_settings(app, settings)
 
         app._env_timer.stop.assert_not_called()
         app.set_interval.assert_not_called()

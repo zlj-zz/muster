@@ -27,7 +27,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run tests with coverage
-        run: pytest -q --cov=muster --cov-report=xml
+        run: pytest -q --cov=muster --cov-report=xml --cov-fail-under=80
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5

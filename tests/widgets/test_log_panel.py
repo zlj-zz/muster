@@ -248,7 +248,7 @@ class TestLogPanelHistoricalLoad:
 
     async def test_loads_from_disk_when_empty_and_enabled(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            "muster.core.orchestrator._logfile_path",
+            "muster.core.logstore._logfile_path",
             lambda svc, now=None: tmp_path / f"{svc}.log",
         )
         logfile = tmp_path / "api.log"
@@ -267,7 +267,7 @@ class TestLogPanelHistoricalLoad:
 
     async def test_skips_disk_when_disabled(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            "muster.core.orchestrator._logfile_path",
+            "muster.core.logstore._logfile_path",
             lambda svc, now=None: tmp_path / f"{svc}.log",
         )
         logfile = tmp_path / "api.log"
@@ -285,7 +285,7 @@ class TestLogPanelHistoricalLoad:
 
     async def test_skips_disk_when_already_loaded(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            "muster.core.orchestrator._logfile_path",
+            "muster.core.logstore._logfile_path",
             lambda svc, now=None: tmp_path / f"{svc}.log",
         )
         logfile = tmp_path / "api.log"

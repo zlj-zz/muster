@@ -30,18 +30,19 @@ def load_settings() -> AppSettings:
     except (json.JSONDecodeError, OSError):
         return AppSettings()
 
-    # Migrate legacy unified timeout field into separate timeouts.
+    # One-time migration of the legacy unified timeout field: split into
+    # health/layer timeouts and raise unreasonably short values so that
+    # compile-heavy services do not falsely fail on first start. Only runs
+    # when the legacy key is present — afterwards user-saved timeouts are
+    # respected verbatim.
     if "start_timeout" in data:
         start_timeout = data.pop("start_timeout")
-        data.setdefault("health_timeout", start_timeout)
-        data.setdefault("layer_timeout", max(start_timeout * 2, 120))
-
-    # Raise unreasonably short timeouts saved by older versions so that
-    # compile-heavy go-zero services do not falsely fail on first start.
-    if data.get("health_timeout", 300) <= 120:
-        data["health_timeout"] = 300
-    if data.get("layer_timeout", 300) <= 120:
-        data["layer_timeout"] = 300
+        health = data.setdefault("health_timeout", start_timeout)
+        if health <= 120:
+            data["health_timeout"] = 300
+        layer = data.setdefault("layer_timeout", max(start_timeout * 2, 120))
+        if layer <= 120:
+            data["layer_timeout"] = 300
 
     # Merge with defaults so new fields are back-filled.
     merged = AppSettings().__dict__.copy()
@@ -66,52 +67,3 @@ def save_settings(settings: AppSettings) -> None:
     _SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
     with open(_SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(settings.__dict__, f, indent=2)
-
-
-def apply_to_app(app, settings: AppSettings) -> None:
-    """Apply settings to a running :class:`MusterApp`.
-
-    Updates orchestrator parameters, log panel behaviour, and
-    re-schedules the environment refresh timer when the interval
-    changes.
-
-    Args:
-        app: The running ``MusterApp`` instance.
-        settings: The new settings to apply.
-    """
-    # Update orchestrator
-    app._orchestrator.stop_timeout = settings.stop_timeout
-    app._orchestrator.health_timeout = settings.health_timeout
-    app._orchestrator.layer_timeout = settings.layer_timeout
-    app._orchestrator.port_conflict_strategy = settings.port_conflict_strategy
-
-    # Update log panel
-    from textual.css.query import NoMatches
-    from ..widgets.log_panel import LogPanel
-
-    try:
-        log_panel = app.query_one("#log", LogPanel)
-    except NoMatches:
-        log_panel = None
-
-    if log_panel is not None:
-        log_panel.auto_scroll = settings.log_auto_scroll
-        log_panel.show_timestamp = settings.log_show_timestamp
-        log_panel.wrap = settings.log_wrap
-        log_panel.buffer_lines = settings.log_buffer_lines
-        log_panel.load_history = settings.load_history_on_startup
-        log_panel.set_wrap(settings.log_wrap)
-        log_panel.resize_buffer(settings.log_buffer_lines)
-        if log_panel._log_level == "ALL":
-            log_panel._set_level(settings.log_default_level)
-
-    # Re-schedule env refresh timer if interval changed
-    old_interval = getattr(app, "_env_refresh_interval", 5)
-    if old_interval != settings.env_refresh_interval:
-        app._env_refresh_interval = settings.env_refresh_interval
-        if hasattr(app, "_env_timer") and app._env_timer is not None:
-            app._env_timer.stop()
-        app._env_timer = app.set_interval(
-            settings.env_refresh_interval,
-            app._refresh_env_status,
-        )

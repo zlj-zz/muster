@@ -11,13 +11,6 @@ import yaml
 
 from .models import EnvCheck, Group, MusterConfig, PortDiscovery, Service
 
-DEFAULT_STATUS_COLORS = {
-    "stopped": "#6e7681",
-    "starting": "#dcdcaa",
-    "running": "#4ec9b0",
-    "failed": "#f44747",
-}
-
 DEFAULT_GROUPS = [
     Group(id="domain", label="DOMAIN", color="#61afef", order=0),
     Group(id="aggregation", label="AGGREGATION", color="#c678dd", order=1),
