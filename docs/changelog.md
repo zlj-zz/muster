@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-28
+
+### Fixed
+- Wake dependency waiters when a service fails to spawn, so `start_with_deps`
+  no longer stalls the whole layer for `layer_timeout` (was up to 300s)
+- Run environment checks via `asyncio.to_thread` so unreachable hosts no
+  longer freeze the UI event loop during auto-refresh
+- Route stop-failure messages through the log callback instead of writing
+  to stderr, which corrupted the TUI display
+
+### Changed
+- Pin `textual` to `>=8,<9` (was `>=0.50.0` with no upper bound, while the
+  lockfile already resolved 8.x)
+
 ## [0.2.2] - 2026-05-11
 
 ### Added

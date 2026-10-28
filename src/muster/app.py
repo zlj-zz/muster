@@ -198,7 +198,7 @@ class MusterApp(App):
 
         self.title = "muster"
         self._update_mode_badge()
-        self._refresh_env_status()
+        self.run_worker(self._refresh_env_status())
         self._env_timer = self.set_interval(
             self._settings.env_refresh_interval, self._refresh_env_status
         )
@@ -365,12 +365,19 @@ class MusterApp(App):
         except NoMatches:
             pass
 
-    def _refresh_env_status(self) -> None:
-        """Poll environment checks and refresh all indicators."""
+    async def _refresh_env_status(self) -> None:
+        """Poll environment checks and refresh all indicators.
+
+        Uses ``asyncio.to_thread`` so the blocking socket probes in
+        ``check_env`` do not stall the UI event loop (same pattern as
+        ``_refresh_resources``).
+        """
         from textual.css.query import NoMatches
 
         try:
-            results = check_env(self._muster_config.env_checks)
+            results = await asyncio.to_thread(
+                check_env, self._muster_config.env_checks
+            )
         except (OSError, RuntimeError, AttributeError) as e:
             self.log.error(f"env check failed: {e}")
             return
@@ -575,7 +582,7 @@ class MusterApp(App):
 
     def action_refresh_env(self) -> None:
         """Manually trigger an environment status refresh."""
-        self._refresh_env_status()
+        self.run_worker(self._refresh_env_status())
 
     async def action_quit(self) -> None:
         """Gracefully shut down before exiting the application."""

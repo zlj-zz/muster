@@ -383,6 +383,9 @@ class ServiceOrchestrator:
             self._log(svc.name, err_msg)
             async with self._get_lock(svc.name):
                 self._set_status(svc, Status.FAILED)
+            # Wake dependency waiters now; otherwise start_with_deps stalls the
+            # whole layer for layer_timeout on a spawn-time failure.
+            svc._ready_event.set()
             self._notify(f"Start {svc.name} failed: {e}", "error")
 
     async def stop(self, svc: Service) -> None:
@@ -423,14 +426,9 @@ class ServiceOrchestrator:
                     os.killpg(os.getpgid(svc.proc.pid), signal.SIGKILL)
                     await asyncio.wait_for(svc.proc.wait(), timeout=2.0)
                 except Exception as e:
-                    # Log to stderr since the logger may already be torn down.
-                    import sys
-
-                    print(f"SIGKILL failed for {svc.name}: {e}", file=sys.stderr)
+                    self._log(svc.name, f"muster▸SIGKILL failed: {e}")
             except Exception as e:
-                import sys
-
-                print(f"stop_service failed for {svc.name}: {e}", file=sys.stderr)
+                self._log(svc.name, f"muster▸stop_service failed: {e}")
 
         svc.proc = None
         svc.start_time = None

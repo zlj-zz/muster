@@ -68,6 +68,8 @@ class TestOrchestratorStart:
         await orch.start(svc, mode="missing")
         assert svc.status == Status.FAILED
         assert svc.last_error is not None
+        # C1 regression: failed start must wake dependency waiters.
+        assert svc._ready_event.is_set()
 
     async def test_already_running_skips(self):
         svc = Service(name="api", cmd="echo hello", group="backend")
