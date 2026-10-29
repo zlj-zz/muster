@@ -82,6 +82,11 @@ services:
     group: infra
     port: 9101
     depends_on: []
+    # Readiness probe: wait until /health returns 200 (instead of TCP connect).
+    healthcheck:
+      type: http
+      url: http://127.0.0.1:9101/health
+      expect_status: 200
 
   - name: cache-service
     cmd: "python3 -c \"import http.server, socketserver; h=type('H',(http.server.BaseHTTPRequestHandler,),{'do_GET':lambda s:s.send_response(200)or s.end_headers()}); socketserver.TCPServer(('127.0.0.1', 9102), h).serve_forever()\""

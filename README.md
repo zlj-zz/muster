@@ -101,6 +101,17 @@ services:
 | `1` / `2` / `3` / `4` | Switch to Svc / Env / Yaml / Settings tab |
 | `ctrl+q` | Quit |
 
+## Importing a Procfile
+
+Coming from foreman/overmind? Convert an existing Procfile:
+
+```bash
+muster import                    # reads ./Procfile, writes ./muster-compose.yaml
+muster import path/to/Procfile -o my.yaml --force
+```
+
+Ports are not inferred — add `port:`/`healthcheck:` entries afterwards.
+
 ## Configuration Reference
 
 See [`example/muster-compose.yaml`](example/muster-compose.yaml) for a full-featured example.
@@ -192,6 +203,27 @@ Crash restart policy. Defaults to `off` (a crashed service stays FAILED).
 |-------|-----------|
 | `off` | No automatic restart |
 | `on-failure` | Auto-restart on abnormal exit (non-zero code); max 3 attempts with linear backoff; the attempt budget resets once the service passes its health check |
+
+Manual (`R`) and automatic restarts are counted separately
+(`restart_count` vs `auto_restart_count` in the detail panel/logs).
+
+### `services[].healthcheck`
+
+Readiness probe. Defaults to `tcp` (poll the service's port).
+
+| Value | Behaviour |
+|-------|-----------|
+| `none` | No gate — RUNNING right after spawn (workers, one-shot jobs) |
+| `tcp` | Poll the port until it accepts connections |
+| `{type: http, url: ..., expect_status: ...}` | Poll the URL until it returns the expected status |
+
+```yaml
+healthcheck: none
+healthcheck:
+  type: http
+  url: http://127.0.0.1:8080/health
+  expect_status: 200
+```
 
 Manual (`R`) and automatic restarts are counted separately
 (`restart_count` vs `auto_restart_count` in the detail panel/logs).

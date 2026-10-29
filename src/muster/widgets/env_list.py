@@ -79,6 +79,13 @@ class EnvList(Tree):
         text.append(f"  {result}", Style(color=dim_color))
         return text
 
+    def rebuild(self) -> None:
+        """Clear and rebuild the environment tree."""
+        self._node_map.clear()
+        for child in list(self.root.children):
+            child.remove()
+        self._build_tree()
+
     def refresh_checks(self, results: list[tuple[str, bool]]) -> None:
         """Update node labels with fresh check results.
 

@@ -99,6 +99,20 @@ class PortDiscovery:
 
 
 @dataclass
+class HealthCheck:
+    """Per-service readiness probe configuration.
+
+    ``type`` is ``"none"`` (no gate — RUNNING right after spawn),
+    ``"tcp"`` (default when unset — poll the resolved port) or ``"http"``
+    (poll *url* until it returns *expect_status*).
+    """
+
+    type: str = "tcp"
+    url: str = ""
+    expect_status: int = 200
+
+
+@dataclass
 class Service:
     """A single runnable service.
 
@@ -113,6 +127,7 @@ class Service:
         port: Statically configured port (overrides auto-discovery).
         depends_on: Names of services that must start before this one.
         restart: Crash restart policy — ``"off"`` (default) or ``"on-failure"``.
+        healthcheck: Readiness probe (``None`` → TCP gate on *port*).
         status: Current runtime state (defaults to ``Status.STOPPED``).
         proc: Active ``asyncio`` subprocess handle.
         log_lines: Ring-buffer of the most recent log lines.
@@ -126,6 +141,7 @@ class Service:
     port: int | None = None
     depends_on: list[str] = field(default_factory=list)
     restart: str = "off"
+    healthcheck: HealthCheck | None = None
 
     # runtime state
     status: Status = Status.STOPPED
@@ -164,6 +180,11 @@ class Service:
         if isinstance(self.cmd, dict):
             return list(self.cmd.keys())
         return ["default"]
+
+    @property
+    def health_type(self) -> str:
+        """Effective readiness probe type (``"tcp"`` when unset)."""
+        return self.healthcheck.type if self.healthcheck else "tcp"
 
 
 @dataclass

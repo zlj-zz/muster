@@ -197,3 +197,52 @@ services:
         )
         _, services = load_config(path)
         assert services[0].restart == "off"
+
+
+class TestLoadConfigHealthcheck:
+    def test_none_string_shorthand(self, tmp_yaml):
+        path = tmp_yaml(
+            """
+services:
+  - name: worker
+    cmd: "echo hi"
+    group: backend
+    healthcheck: none
+"""
+        )
+        _, services = load_config(path)
+        assert services[0].healthcheck is not None
+        assert services[0].health_type == "none"
+
+    def test_dict_form(self, tmp_yaml):
+        path = tmp_yaml(
+            """
+services:
+  - name: api
+    cmd: "echo hi"
+    group: backend
+    healthcheck:
+      type: http
+      url: http://127.0.0.1:8080/health
+      expect_status: 204
+"""
+        )
+        _, services = load_config(path)
+        hc = services[0].healthcheck
+        assert hc is not None
+        assert hc.type == "http"
+        assert hc.url == "http://127.0.0.1:8080/health"
+        assert hc.expect_status == 204
+
+    def test_absent_defaults_to_tcp(self, tmp_yaml):
+        path = tmp_yaml(
+            """
+services:
+  - name: api
+    cmd: "echo hi"
+    group: backend
+"""
+        )
+        _, services = load_config(path)
+        assert services[0].healthcheck is None
+        assert services[0].health_type == "tcp"

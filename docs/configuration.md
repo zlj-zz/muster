@@ -98,3 +98,28 @@ With `on-failure`, muster restarts the service after an abnormal exit
 counter resets when the service reaches `RUNNING` again. Manual (`R`)
 and automatic restarts are counted separately (`restart_count` vs
 `auto_restart_count`).
+
+## `services[].healthcheck`
+
+Readiness probe — `tcp` (default), `none`, or `http`.
+
+```yaml
+services:
+  - name: worker
+    cmd: "python worker.py"
+    group: backend
+    healthcheck: none          # no gate: RUNNING right after spawn
+
+  - name: api
+    cmd: "go run main.go"
+    group: backend
+    healthcheck:
+      type: http
+      url: http://127.0.0.1:8080/health
+      expect_status: 200       # poll until this status is returned
+```
+
+With `none`, the service is marked RUNNING immediately after spawn —
+use it for workers that never listen on a port. With `http`, muster
+polls the URL (2s request timeout) until it returns `expect_status`,
+within the configured health timeout.

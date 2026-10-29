@@ -15,7 +15,7 @@ from datetime import datetime
 from collections.abc import Callable
 
 from ..models import MusterConfig, Service, Status
-from .env import check_tcp
+from .env import check_http, check_tcp
 from .logstore import _cleanup_old_logs, _logfile_path
 from .process import kill_port_owner
 from .resolver import resolve_dependencies, resolve_port
@@ -593,6 +593,52 @@ class ServiceOrchestrator:
         # task overwrite the new _health_tasks bookkeeping.
         asyncio.create_task(self.start(svc))
 
+    async def _fail_readiness(self, svc: Service, reason: str) -> None:
+        """Mark a service FAILED, wake dependency waiters, and surface *reason*."""
+        async with self._get_lock(svc.name):
+            self._set_status(svc, Status.FAILED)
+        svc._ready_event.set()
+        self._log(svc.name, f"muster▸{reason}")
+        self._notify(reason, "error")
+
+    async def _http_health_check(self, svc: Service) -> None:
+        """Poll an HTTP endpoint until it returns the expected status.
+
+        Args:
+            svc: Service with ``healthcheck.type == "http"``.
+        """
+        hc = svc.healthcheck
+        if hc is None:  # guarded by health_type; kept for type checkers
+            return
+        self._log(
+            svc.name,
+            f"muster▸HTTP health check {hc.url} (timeout: {self.health_timeout}s)",
+        )
+        for i in range(self.health_timeout):
+            async with self._get_lock(svc.name):
+                if svc.proc is None or svc.proc.returncode is not None:
+                    self._set_status(svc, Status.FAILED)
+            if svc.status == Status.FAILED:
+                self._log(svc.name, "muster▸Process exited, health check failed")
+                svc._ready_event.set()
+                return
+            ok, _latency = await asyncio.to_thread(
+                check_http, hc.url, "GET", hc.expect_status, 2.0
+            )
+            if ok:
+                async with self._get_lock(svc.name):
+                    self._set_status(svc, Status.RUNNING)
+                # A stable run refills the auto-restart budget.
+                self._restart_attempts[svc.name] = 0
+                svc._ready_event.set()
+                self._log(svc.name, f"muster▸Service ready (http {hc.url})")
+                self._notify(f"{svc.name} ready ({hc.url})", "success")
+                return
+            if i % 5 == 0:
+                self._log(svc.name, f"muster▸Waiting for {hc.url}... ({i}s)")
+            await asyncio.sleep(1)
+        await self._fail_readiness(svc, f"{svc.name} http check failed ({hc.url})")
+
     async def _health_check(self, svc: Service) -> None:
         """Poll the service's TCP port until it accepts connections.
 
@@ -606,6 +652,17 @@ class ServiceOrchestrator:
             svc: Service to health-check.
         """
         try:
+            if svc.health_type == "none":
+                # No readiness gate: RUNNING as soon as the process is up.
+                async with self._get_lock(svc.name):
+                    self._set_status(svc, Status.RUNNING)
+                self._restart_attempts[svc.name] = 0
+                svc._ready_event.set()
+                self._log(svc.name, "muster▸Healthcheck disabled — marked RUNNING")
+                return
+            if svc.health_type == "http":
+                await self._http_health_check(svc)
+                return
             port = self._resolve_effective_port(svc)
             if port is None:
                 self._log(
@@ -681,24 +738,34 @@ class ServiceOrchestrator:
             except asyncio.CancelledError:
                 return
 
-            running = [
-                (svc, port)
-                for svc in self.registry.values()
-                if svc.status == Status.RUNNING
-                and (port := self._resolve_effective_port(svc)) is not None
-            ]
-            if not running:
+            probes: list[tuple[Service, str, asyncio.Task]] = []
+            for svc in self.registry.values():
+                if svc.status != Status.RUNNING or svc.health_type == "none":
+                    # none-type services have no meaningful probe; crashes
+                    # surface via _wait_process instead.
+                    continue
+                if svc.health_type == "http" and svc.healthcheck:
+                    url = svc.healthcheck.url
+                    label = f"http {url}"
+                    task = asyncio.to_thread(
+                        check_http, url, "GET", svc.healthcheck.expect_status
+                    )
+                else:
+                    port = self._resolve_effective_port(svc)
+                    if port is None:
+                        continue
+                    label = f"port {port}"
+                    task = asyncio.to_thread(check_tcp, "127.0.0.1", port)
+                probes.append((svc, label, task))
+            if not probes:
                 continue
 
             results = await asyncio.gather(
-                *[
-                    asyncio.to_thread(check_tcp, "127.0.0.1", port)
-                    for _, port in running
-                ],
+                *[task for _, _, task in probes],
                 return_exceptions=True,
             )
 
-            for (svc, port), result in zip(running, results):
+            for (svc, label), result in zip(probes, results):
                 if isinstance(result, Exception):
                     err_msg = f"muster▸Runtime health check error: {result}"
                     svc.log_lines.append(err_msg)
@@ -706,7 +773,7 @@ class ServiceOrchestrator:
                     continue
                 ok, _latency = result
                 if ok:
-                    ok_msg = f"muster▸Health check ok (port {port})"
+                    ok_msg = f"muster▸Health check ok ({label})"
                     svc.log_lines.append(ok_msg)
                     self._log(svc.name, ok_msg)
                     continue
@@ -714,11 +781,11 @@ class ServiceOrchestrator:
                     if svc.status != Status.RUNNING:
                         continue
                     svc.last_error = (
-                        f"runtime health check failed (port {port})"
+                        f"runtime health check failed ({label})"
                     )
                     self._set_status(svc, Status.FAILED)
                 msg = (
-                    f"muster▸Runtime health check failed (port {port}),"
+                    f"muster▸Runtime health check failed ({label}),"
                     " marking FAILED"
                 )
                 svc.log_lines.append(msg)

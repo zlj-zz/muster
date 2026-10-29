@@ -177,3 +177,53 @@ class TestAutoRestartRecovery:
             assert svc.auto_restart_count == 1
         finally:
             await orch.stop(svc)
+
+
+class TestHealthcheckTypes:
+    """Real-process readiness probes."""
+
+    async def test_none_type_is_ready_fast(self):
+        """healthcheck: none skips the 3s liveness heuristic entirely."""
+        svc = Service(name="worker", cmd="sleep 60", group="backend")
+        from muster.models import HealthCheck
+
+        svc.healthcheck = HealthCheck(type="none")
+        orch = _make_orchestrator({"worker": svc})
+        try:
+            started = time.monotonic()
+            await asyncio.wait_for(orch.start(svc), timeout=30)
+            await asyncio.wait_for(svc._ready_event.wait(), timeout=10)
+            elapsed = time.monotonic() - started
+            assert svc.status == Status.RUNNING
+            # Liveness fallback would take >=3s; none-type returns at once.
+            assert elapsed < 3
+        finally:
+            await orch.stop(svc)
+
+    async def test_http_probe_recovers_running(self):
+        port = _free_port()
+        cmd = (
+            f'{sys.executable} -c "import http.server, socketserver; '
+            "h=type('H',(http.server.BaseHTTPRequestHandler,),"
+            "{'do_GET':lambda s:s.send_response(200) or s.end_headers()}); "
+            f'socketserver.TCPServer((\'127.0.0.1\', {port}), h).serve_forever()"'
+        )
+        from muster.models import HealthCheck
+
+        svc = Service(
+            name="web",
+            cmd=cmd,
+            group="backend",
+            port=port,
+            healthcheck=HealthCheck(
+                type="http", url=f"http://127.0.0.1:{port}/health"
+            ),
+        )
+        orch = _make_orchestrator({"web": svc})
+        orch.health_timeout = 20
+        try:
+            await asyncio.wait_for(orch.start(svc), timeout=30)
+            await asyncio.wait_for(svc._ready_event.wait(), timeout=25)
+            assert svc.status == Status.RUNNING
+        finally:
+            await orch.stop(svc)

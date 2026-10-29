@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-from .models import EnvCheck, Group, MusterConfig, PortDiscovery, Service
+from .models import EnvCheck, Group, HealthCheck, MusterConfig, PortDiscovery, Service
 
 DEFAULT_GROUPS = [
     Group(id="domain", label="DOMAIN", color="#61afef", order=0),
@@ -93,6 +93,17 @@ def load_config(yaml_path: Path) -> tuple[MusterConfig, list[Service]]:
         cmd = item.get("cmd", "")
         if isinstance(cmd, str) and "cmd_test" in item:
             cmd = {"default": cmd, "test": item["cmd_test"]}
+        raw_hc = item.get("healthcheck")
+        if raw_hc is None:
+            healthcheck = None
+        elif isinstance(raw_hc, str):
+            healthcheck = HealthCheck(type=raw_hc)
+        else:
+            healthcheck = HealthCheck(
+                type=raw_hc.get("type", "tcp"),
+                url=raw_hc.get("url", ""),
+                expect_status=raw_hc.get("expect_status", 200),
+            )
         services.append(
             Service(
                 name=item["name"],
@@ -101,6 +112,7 @@ def load_config(yaml_path: Path) -> tuple[MusterConfig, list[Service]]:
                 port=item.get("port"),
                 depends_on=item.get("depends_on", []),
                 restart=item.get("restart", "off"),
+                healthcheck=healthcheck,
             )
         )
 

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-28
+
+### Added
+- `services[].healthcheck` readiness probe: `tcp` (default), `none`
+  (workers run without a port gate — no more false FAILED), or `http`
+  (`url` + `expect_status` — readiness means the app really answers);
+  the 30s runtime probe follows the configured type
+- `muster import`: convert a foreman-style Procfile into
+  `muster-compose.yaml` (one command, ports added manually afterwards)
+- Hot reload: the running TUI watches the compose file and applies
+  external edits (in-place service merge keeps runtime state; files
+  that fail validation are rejected with a toast)
+- Log search is case-insensitive by default; `re:` prefix enables regex
+
 ## [0.4.0] - 2026-10-28
 
 ### Added

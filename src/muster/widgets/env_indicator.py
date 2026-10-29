@@ -25,6 +25,10 @@ class EnvIndicator(Static):
         super().__init__(**kwargs)
         self._config = config
 
+    def update_config(self, config: MusterConfig) -> None:
+        """Point the indicator at a new config (hot reload)."""
+        self._config = config
+
     def refresh_indicators(self, results: list[tuple[str, bool]]) -> None:
         """Update indicator dots with pre-computed check results.
 

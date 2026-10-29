@@ -105,6 +105,7 @@ class InteractiveRichLog(RichLog):
         self._visible_meta_indices: list[int] = []
         self._level_filter: str = "ALL"
         self._search_query: str = ""
+        self._search_re: re.Pattern | None = None
         self._line_parser: Callable[[str], str] = lambda _line: "INFO"
         self._matches: list[int] = []
         self._match_idx: int = -1
@@ -211,11 +212,40 @@ class InteractiveRichLog(RichLog):
         self._rebuild()
 
     def set_search_query(self, query: str) -> None:
-        """Update search query and refresh highlights."""
+        """Update search query and refresh highlights.
+
+        A ``re:`` prefix switches to regex matching; an invalid pattern
+        falls back to a literal (case-insensitive) search.
+        """
         if self._search_query == query:
             return
         self._search_query = query
+        self._search_re = None
+        if query.startswith("re:"):
+            try:
+                self._search_re = re.compile(query[3:])
+            except re.error:
+                pass  # invalid pattern — _match_span falls back to literal
         self._rebuild()
+
+    def _match_span(self, raw: str) -> tuple[int, int]:
+        """Return ``(start, end)`` of the first query match in *raw*.
+
+        Matching is case-insensitive substring; a ``re:`` prefix switches
+        to regex. Returns ``(-1, -1)`` when there is no match.
+        """
+        query = self._search_query
+        if not query:
+            return -1, -1
+        if query.startswith("re:"):
+            if self._search_re is not None:
+                match = self._search_re.search(raw)
+                return (match.start(), match.end()) if match else (-1, -1)
+            needle = query[3:]
+        else:
+            needle = query
+        idx = raw.lower().find(needle.lower())
+        return (idx, idx + len(needle)) if idx >= 0 else (-1, -1)
 
     def next_match(self) -> None:
         """Jump to the next search match (wraps around)."""
@@ -254,9 +284,9 @@ class InteractiveRichLog(RichLog):
                 content.stylize(color)
 
         if self._search_query:
-            idx = meta.raw.find(self._search_query)
-            if idx >= 0:
-                content.stylize("bold #eab459", idx, idx + len(self._search_query))
+            start, end = self._match_span(meta.raw)
+            if start >= 0:
+                content.stylize("bold #eab459", start, end)
         if meta.prefix:
             return RichText.assemble(
                 lineno, (f"{meta.prefix} │ ", meta.prefix_style or "bold"), content
@@ -340,7 +370,7 @@ class InteractiveRichLog(RichLog):
             return
         for vis_idx, meta_idx in enumerate(self._visible_meta_indices):
             meta = self._meta[meta_idx]
-            if self._search_query in meta.raw:
+            if self._match_span(meta.raw)[0] >= 0:
                 self._matches.append(self._line_to_screen[vis_idx])
         if self._matches:
             self._match_idx = 0

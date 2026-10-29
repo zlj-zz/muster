@@ -68,7 +68,7 @@ class LogPanel(Vertical):
         with Horizontal(id="log-search-row"):
             yield Static("❯ ", id="log-search-prefix")
             yield Input(
-                placeholder="Search logs...",
+                placeholder="Search logs... (re: prefix = regex)",
                 id="log-search",
             )
             yield Static("", id="log-search-count")

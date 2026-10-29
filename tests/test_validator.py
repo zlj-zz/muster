@@ -120,3 +120,33 @@ def test_invalid_restart_policy(sample_config):
     services = [Service(name="api", cmd="echo", group="backend", restart="always")]
     with pytest.raises(ConfigError, match="invalid restart policy"):
         validate_config(sample_config, services)
+
+
+def test_invalid_healthcheck_type(sample_config):
+    from muster.models import HealthCheck
+
+    services = [
+        Service(
+            name="api",
+            cmd="echo",
+            group="backend",
+            healthcheck=HealthCheck(type="grpc"),
+        )
+    ]
+    with pytest.raises(ConfigError, match="invalid healthcheck type"):
+        validate_config(sample_config, services)
+
+
+def test_http_healthcheck_requires_url(sample_config):
+    from muster.models import HealthCheck
+
+    services = [
+        Service(
+            name="api",
+            cmd="echo",
+            group="backend",
+            healthcheck=HealthCheck(type="http"),
+        )
+    ]
+    with pytest.raises(ConfigError, match="requires a url"):
+        validate_config(sample_config, services)

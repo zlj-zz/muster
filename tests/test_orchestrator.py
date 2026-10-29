@@ -279,3 +279,63 @@ class TestAutoRestart:
             await asyncio.sleep(0)
             mock_start.assert_not_awaited()
         assert svc.auto_restart_count == 0
+
+
+class TestHealthcheckTypes:
+    """Per-service readiness probe (none / tcp / http)."""
+
+    async def test_none_marks_running_immediately(self):
+        from muster.models import HealthCheck
+
+        svc = Service(
+            name="worker",
+            cmd="sleep 60",
+            group="backend",
+            healthcheck=HealthCheck(type="none"),
+        )
+        svc.status = Status.STARTING
+        svc.proc = MagicMock(returncode=None)
+        orch = _make_orchestrator({"worker": svc})
+        await asyncio.wait_for(orch._health_check(svc), timeout=5)
+        assert svc.status == Status.RUNNING
+        assert svc._ready_event.is_set()
+
+    @patch("muster.core.orchestrator.check_http", return_value=(True, 5))
+    async def test_http_success_marks_running(self, mock_check_http):
+        from muster.models import HealthCheck
+
+        svc = Service(
+            name="api",
+            cmd="sleep 60",
+            group="backend",
+            healthcheck=HealthCheck(
+                type="http", url="http://127.0.0.1:8080/health"
+            ),
+        )
+        svc.status = Status.STARTING
+        svc.proc = MagicMock(returncode=None)
+        orch = _make_orchestrator({"api": svc})
+        await asyncio.wait_for(orch._health_check(svc), timeout=5)
+        assert svc.status == Status.RUNNING
+        assert svc._ready_event.is_set()
+        mock_check_http.assert_called()
+
+    @patch("muster.core.orchestrator.check_http", return_value=(False, None))
+    async def test_http_timeout_marks_failed(self, mock_check_http):
+        from muster.models import HealthCheck
+
+        svc = Service(
+            name="api",
+            cmd="sleep 60",
+            group="backend",
+            healthcheck=HealthCheck(
+                type="http", url="http://127.0.0.1:8080/health"
+            ),
+        )
+        svc.status = Status.STARTING
+        svc.proc = MagicMock(returncode=None)
+        orch = _make_orchestrator({"api": svc})
+        orch.health_timeout = 2
+        await asyncio.wait_for(orch._health_check(svc), timeout=10)
+        assert svc.status == Status.FAILED
+        assert svc._ready_event.is_set()

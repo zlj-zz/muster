@@ -419,3 +419,69 @@ class TestAppAllLogs:
             log_panel = app.query_one("#log", LogPanel)
             assert log_panel._all_mode
             assert log_panel.border_title == "Logs: ALL services"
+
+
+class TestConfigHotReload:
+    async def test_apply_reloaded_config_merges_in_place(self, minimal_app, minimal_config):
+        app = minimal_app
+        updated = Service(
+            name="api", cmd="go run NEW", group="backend", restart="on-failure"
+        )
+        added = Service(name="db", cmd="postgres", group="frontend")
+        existing_api = app.registry["api"]
+
+        async with app.run_test():
+            app._apply_reloaded_config(minimal_config, [updated, added])
+
+        assert app.registry["api"] is existing_api
+        assert existing_api.cmd == "go run NEW"
+        assert existing_api.restart == "on-failure"
+        assert app.registry["db"] is added
+        assert app._service_tree.services is app.all_services
+
+    async def test_removed_services_dropped_only_when_stopped(self, minimal_app, minimal_config):
+        app = minimal_app
+        web = app.registry["web"]
+        web.status = Status.RUNNING
+
+        async with app.run_test():
+            app._apply_reloaded_config(minimal_config, [app.registry["api"]])
+            assert "web" in app.registry  # running — kept with a warning
+
+            web.status = Status.STOPPED
+            app._apply_reloaded_config(minimal_config, [app.registry["api"]])
+            assert "web" not in app.registry
+
+    async def test_reload_config_happy_path(self, minimal_app, tmp_path):
+        app = minimal_app
+        cfg = tmp_path / "muster-compose.yaml"
+        cfg.write_text(
+            "config:\n"
+            "  groups:\n"
+            "    - id: backend\n      label: BACKEND\n      color: '#569cd6'\n      order: 0\n"
+            "services:\n"
+            "  - name: api\n    cmd: echo hi\n    group: backend\n",
+            encoding="utf-8",
+        )
+        app._config_path = cfg
+        async with app.run_test():
+            await app._reload_config()
+            assert app.registry["api"].cmd == "echo hi"
+
+    async def test_reload_invalid_config_keeps_old(self, minimal_app, tmp_path):
+        app = minimal_app
+        cfg = tmp_path / "muster-compose.yaml"
+        cfg.write_text(
+            "config:\n"
+            "  groups:\n"
+            "    - id: backend\n      label: BACKEND\n      color: '#569cd6'\n      order: 0\n"
+            "services:\n"
+            "  - name: api\n    cmd: echo a\n    group: backend\n"
+            "  - name: api\n    cmd: echo b\n    group: backend\n",
+            encoding="utf-8",
+        )
+        app._config_path = cfg
+        before_cmd = app.registry["api"].cmd
+        async with app.run_test():
+            await app._reload_config()
+            assert app.registry["api"].cmd == before_cmd

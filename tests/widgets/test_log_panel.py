@@ -353,3 +353,47 @@ class TestAllMode:
             await pilot.pause()
             assert not panel._all_mode
             assert "web line" not in _meta_text(panel)
+
+
+class TestSearchModes:
+    """Case-insensitive substring by default; re: prefix for regex."""
+
+    def _panel_with_lines(self, lines):
+        app = WidgetTestApp(LogPanel())
+        return app, lines
+
+    async def test_case_insensitive_substring(self):
+        app = WidgetTestApp(LogPanel())
+        async with app.run_test() as pilot:
+            panel = app.query_one(LogPanel)
+            svc = Service(name="api", cmd="echo", group="backend")
+            svc.log_lines = deque(["ERROR boom", "all good"])
+            panel.set_service(svc)
+            await pilot.pause()
+            panel._do_search("error")
+            await pilot.pause()
+            assert panel._log_widget.match_count() == 1
+
+    async def test_regex_prefix(self):
+        app = WidgetTestApp(LogPanel())
+        async with app.run_test() as pilot:
+            panel = app.query_one(LogPanel)
+            svc = Service(name="api", cmd="echo", group="backend")
+            svc.log_lines = deque(["err123", "error", "nothing"])
+            panel.set_service(svc)
+            await pilot.pause()
+            panel._do_search("re:err\\d+")
+            await pilot.pause()
+            assert panel._log_widget.match_count() == 1
+
+    async def test_invalid_regex_falls_back_to_literal(self):
+        app = WidgetTestApp(LogPanel())
+        async with app.run_test() as pilot:
+            panel = app.query_one(LogPanel)
+            svc = Service(name="api", cmd="echo", group="backend")
+            svc.log_lines = deque(["re: (unclosed", "other"])
+            panel.set_service(svc)
+            await pilot.pause()
+            panel._do_search("re: (unclosed")
+            await pilot.pause()
+            assert panel._log_widget.match_count() == 1

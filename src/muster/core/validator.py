@@ -44,6 +44,7 @@ def validate_config(config: MusterConfig, services: list[Service]) -> list[str]:
     registry = {s.name: s for s in services}
     _validate_cmds(services)
     _validate_restart(services)
+    _validate_healthchecks(services)
     _validate_groups(services, config)
     _validate_dependencies(services, registry)
     _validate_cycles(registry)
@@ -56,6 +57,9 @@ def validate_config(config: MusterConfig, services: list[Service]) -> list[str]:
 #: Allowed values for the per-service ``restart`` policy.
 _RESTART_POLICIES = {"off", "on-failure"}
 
+#: Allowed values for the per-service ``healthcheck`` probe type.
+_HEALTHCHECK_TYPES = {"none", "tcp", "http"}
+
 
 def _validate_restart(services: list[Service]) -> None:
     """Reject unknown restart policies before the TUI starts."""
@@ -64,6 +68,23 @@ def _validate_restart(services: list[Service]) -> None:
             raise ConfigError(
                 f"service {svc.name!r}: invalid restart policy {svc.restart!r} "
                 f"(expected one of {sorted(_RESTART_POLICIES)})"
+            )
+
+
+def _validate_healthchecks(services: list[Service]) -> None:
+    """Reject unknown probe types and http checks without a url."""
+    for svc in services:
+        if svc.healthcheck is None:
+            continue
+        hc = svc.healthcheck
+        if hc.type not in _HEALTHCHECK_TYPES:
+            raise ConfigError(
+                f"service {svc.name!r}: invalid healthcheck type {hc.type!r} "
+                f"(expected one of {sorted(_HEALTHCHECK_TYPES)})"
+            )
+        if hc.type == "http" and not hc.url:
+            raise ConfigError(
+                f"service {svc.name!r}: healthcheck type http requires a url"
             )
 
 

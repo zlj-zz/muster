@@ -19,9 +19,11 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import ContentSwitcher, Static
 
 from .core.env import check_env
+from .config import load_config
 from .core.orchestrator import ServiceOrchestrator
 from .core.process import get_cpu_memory_percent
 from .core.settings_store import load_settings
+from .core.validator import validate_config
 from .models import AppSettings, Group, MusterConfig, Service, Status
 from .widgets import (
     ActivityBar,
@@ -108,6 +110,7 @@ class MusterApp(App):
         self._resource_timer = None
         self._yaml_files = self._scan_yaml_files()
         self._stop_pending = False
+        self._config_mtime: float | None = None
         # Cached widget references populated in on_mount to avoid repeated
         # expensive query_one calls on the hot log/status callback paths.
         self._log_panel: LogPanel | None = None
@@ -229,6 +232,87 @@ class MusterApp(App):
                 settings.env_refresh_interval, self._refresh_env_status
             )
 
+    def _check_config_changed(self) -> None:
+        """Hot-reload the compose file when its mtime changes."""
+        if self._config_path is None or self._config_mtime is None:
+            return
+        try:
+            mtime = self._config_path.stat().st_mtime
+        except OSError:
+            return
+        if mtime == self._config_mtime:
+            return
+        self._config_mtime = mtime
+        self.run_worker(self._reload_config())
+
+    async def _reload_config(self) -> None:
+        """Reload and hot-apply the compose configuration.
+
+        A file that fails validation keeps the current config; the error is
+        surfaced as a toast so a half-edited file never breaks the session.
+        """
+        assert self._config_path is not None
+        path = self._config_path
+        try:
+            config, services = await asyncio.to_thread(load_config, path)
+            validate_config(config, services)
+        except (OSError, TypeError, ValueError) as exc:
+            self.notify(f"Config reload failed: {exc}", severity="error")
+            return
+        self._apply_reloaded_config(config, services)
+
+    def _apply_reloaded_config(
+        self, config: MusterConfig, services: list[Service]
+    ) -> None:
+        """Merge a reloaded configuration into the running app.
+
+        Existing Service objects are updated in place so runtime state
+        (process handle, log buffer, status) survives the reload. Command
+        changes take effect on the next start/restart.
+
+        Args:
+            config: The freshly parsed configuration.
+            services: The freshly parsed service list.
+        """
+        for svc in services:
+            existing = self.registry.get(svc.name)
+            if existing is None:
+                self.registry[svc.name] = svc
+                self.all_services.append(svc)
+                continue
+            existing.cmd = svc.cmd
+            existing.group = svc.group
+            existing.port = svc.port
+            existing.depends_on = svc.depends_on
+            existing.restart = svc.restart
+            existing.healthcheck = svc.healthcheck
+        new_names = {svc.name for svc in services}
+        for name in [n for n in self.registry if n not in new_names]:
+            svc = self.registry[name]
+            if svc.status in (Status.STOPPED, Status.FAILED):
+                del self.registry[name]
+                self.all_services = [
+                    s for s in self.all_services if s.name != name
+                ]
+            else:
+                self.notify(
+                    f"{name} removed from config but still running; kept",
+                    severity="warning",
+                )
+        self._muster_config = config
+        self._service_tree.services = self.all_services
+        self._service_tree.groups = config.groups
+        self._service_tree.rebuild()
+        env_list = self.query_one("#env-list", EnvList)
+        env_list.env_checks = config.env_checks
+        env_list.rebuild()
+        self.query_one("#env-indicator", EnvIndicator).update_config(config)
+        self.notify(
+            f"Config reloaded ({len(self.all_services)} services) — "
+            "restart services to apply command changes",
+            severity="information",
+        )
+
     def on_mount(self) -> None:
         """Initialise the UI after widgets are mounted.
 
@@ -248,6 +332,14 @@ class MusterApp(App):
         )
         self._resource_timer = self.set_interval(2, self._refresh_resources)
         self.apply_settings(self._settings)
+
+        # Hot-reload: watch the compose file for external edits.
+        if self._config_path is not None:
+            try:
+                self._config_mtime = self._config_path.stat().st_mtime
+            except OSError:
+                self._config_mtime = None
+            self.set_interval(2.0, self._check_config_changed)
 
         # svc tab: auto-select first service
         tree = self._service_tree
