@@ -69,6 +69,7 @@ class MusterApp(App):
         Binding("R", "restart_service", "Restart"),
         Binding("t", "cycle_cmd_mode", "Mode"),
         Binding("l", "cycle_group", "Filter Group"),
+        Binding("a", "show_all_logs", "All Logs"),
         Binding("1", "switch_tab('svc')", "Svc", show=False),
         Binding("2", "switch_tab('env')", "Env", show=False),
         Binding("3", "switch_tab('yaml')", "Yaml", show=False),
@@ -190,6 +191,7 @@ class MusterApp(App):
             f"[{_ACCENT}]R[/] restart  "
             f"[{_ACCENT}]t[/] mode  "
             f"[{_ACCENT}]l[/] filter  "
+            f"[{_ACCENT}]a[/] all-logs  "
             f"[{_ACCENT}]?[/] help"
         )
 
@@ -625,6 +627,14 @@ class MusterApp(App):
     def action_refresh_env(self) -> None:
         """Manually trigger an environment status refresh."""
         self.run_worker(self._refresh_env_status())
+
+    def action_show_all_logs(self) -> None:
+        """Show every service's logs interleaved in the log panel."""
+        group_color = {g.id: g.color for g in self._muster_config.groups}
+        colors = {
+            s.name: group_color.get(s.group, _ACCENT) for s in self.all_services
+        }
+        self._log_panel.set_all_mode(self.all_services, colors)
 
     def action_help(self) -> None:
         """Show the keyboard shortcut overlay."""

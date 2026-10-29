@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-28
+
+### Added
+- `services[].restart` crash policy (`off` default, `on-failure`): auto-restart
+  on abnormal exit, max 3 attempts with linear backoff, attempt budget resets
+  when the service passes its health check; auto restarts counted separately
+  (`auto_restart_count`)
+- `a` key: interleaved all-services log view with per-service coloured
+  prefixes; footer and `?` help overlay updated
+
+### Changed
+- Manual restart (`R`) increments `restart_count` only on success
+- Settings timeout clamp now runs only as one-time legacy migration;
+  user-saved short timeouts are respected verbatim
+- Log storage split into `core/logstore.py`; `core` no longer imports
+  `widgets` (enforced by a regression test)
+
+### Fixed
+- Blocking socket probes (env refresh, port-conflict check, health check) no
+  longer stall the UI event loop
+- Dropped illegal status transitions are logged instead of silently ignored
+- Removed dead code: unused `DEFAULT_STATUS_COLORS` and `StatusBar` widget
+- CI enforces an 80% coverage gate
+
 ## [0.3.0] - 2026-10-28
 
 ### Added

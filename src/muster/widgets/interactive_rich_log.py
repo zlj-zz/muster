@@ -86,6 +86,8 @@ class _LineMeta:
     level: str
     line_no: int
     is_json: bool = False
+    prefix: str = ""
+    prefix_style: str | None = None
 
 
 class InteractiveRichLog(RichLog):
@@ -139,15 +141,29 @@ class InteractiveRichLog(RichLog):
         self.max_lines = maxlen
         self._rebuild()
 
-    def _make_meta(self, text: str, level: str | None = None) -> _LineMeta:
+    def _make_meta(
+        self,
+        text: str,
+        level: str | None = None,
+        prefix: str = "",
+        prefix_style: str | None = None,
+    ) -> _LineMeta:
         """Create a _LineMeta for *text*, inferring level if not provided."""
         level = level or self._line_parser(text)
         line_no = len(self._meta) + 1
-        return _LineMeta(text, level, line_no, _is_json_like(text))
+        return _LineMeta(
+            text, level, line_no, _is_json_like(text), prefix, prefix_style
+        )
 
-    def write_line(self, text: str, level: str | None = None) -> None:
+    def write_line(
+        self,
+        text: str,
+        level: str | None = None,
+        prefix: str = "",
+        prefix_style: str | None = None,
+    ) -> None:
         """Append a single log line."""
-        self._meta.append(self._make_meta(text, level))
+        self._meta.append(self._make_meta(text, level, prefix, prefix_style))
 
         if len(self._meta) == self._meta.maxlen:
             # deque just dropped the oldest line; schedule a full rebuild.
@@ -162,10 +178,17 @@ class InteractiveRichLog(RichLog):
             if self.auto_scroll:
                 self.scroll_end(animate=False)
 
-    def write_lines(self, lines: list[str]) -> None:
+    def write_lines(
+        self,
+        lines: list[str],
+        prefix: str = "",
+        prefix_style: str | None = None,
+    ) -> None:
         """Bulk append lines (used for historical log loading)."""
         for text in lines:
-            self._meta.append(self._make_meta(text))
+            self._meta.append(
+                self._make_meta(text, prefix=prefix, prefix_style=prefix_style)
+            )
         self._rebuild()
 
     def clear(self) -> InteractiveRichLog:  # type: ignore[override]
@@ -234,6 +257,10 @@ class InteractiveRichLog(RichLog):
             idx = meta.raw.find(self._search_query)
             if idx >= 0:
                 content.stylize("bold #eab459", idx, idx + len(self._search_query))
+        if meta.prefix:
+            return RichText.assemble(
+                lineno, (f"{meta.prefix} │ ", meta.prefix_style or "bold"), content
+            )
         return RichText.assemble(lineno, content)
 
     def _highlight_json(self, text: str) -> RichText:

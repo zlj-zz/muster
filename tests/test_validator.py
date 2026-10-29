@@ -114,3 +114,9 @@ class TestValidateConfig:
         )
         with pytest.raises(ConfigError, match="pattern is required"):
             validate_config(config, [Service(name="s", cmd="c", group="g")])
+
+
+def test_invalid_restart_policy(sample_config):
+    services = [Service(name="api", cmd="echo", group="backend", restart="always")]
+    with pytest.raises(ConfigError, match="invalid restart policy"):
+        validate_config(sample_config, services)

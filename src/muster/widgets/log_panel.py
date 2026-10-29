@@ -55,6 +55,8 @@ class LogPanel(Vertical):
         self.buffer_lines: int = 2000
         self.load_history: bool = False
         self._search_dirty: bool = True
+        self._all_mode: bool = False
+        self._svc_colors: dict[str, str] = {}
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="log-level-row"):
@@ -177,6 +179,7 @@ class LogPanel(Vertical):
             self.border_title = "Logs"
             return
 
+        self._all_mode = False
         self._svc_name = svc.name
         self.border_title = f"Logs: {svc.name}"
 
@@ -186,18 +189,52 @@ class LogPanel(Vertical):
         if svc.log_lines:
             self._log_widget.write_lines(list(svc.log_lines))
 
+    def set_all_mode(self, services: list[Service], colors: dict[str, str]) -> None:
+        """Switch the panel to an interleaved view of every service's logs.
+
+        Args:
+            services: All services whose buffered lines should be shown.
+            colors: Service-name to colour mapping for line prefixes.
+        """
+        self._all_mode = True
+        self._svc_name = None
+        self._svc_colors = dict(colors)
+        self.clear()
+        self.border_title = "Logs: ALL services"
+        for svc in services:
+            lines = self._stamp(list(svc.log_lines))
+            if lines:
+                self._log_widget.write_lines(
+                    lines,
+                    prefix=svc.name,
+                    prefix_style=colors.get(svc.name),
+                )
+
+    def _stamp(self, lines: list[str]) -> list[str]:
+        """Prepend timestamps to *lines* when ``show_timestamp`` is on."""
+        if not self.show_timestamp:
+            return lines
+        ts = datetime.now().strftime("%H:%M:%S")
+        return [f"{ts} {line}" for line in lines]
+
     def append_log(self, svc_name: str, line: str) -> None:
-        """Append a single log line if it belongs to the currently shown service.
+        """Append a single log line.
+
+        In single-service mode only lines of the shown service are written;
+        in ALL mode every line is written with a service-name prefix.
 
         Args:
             svc_name: Name of the service that produced the line.
             line: Raw log line text.
         """
-        if self._svc_name != svc_name:
+        if not self._all_mode and self._svc_name != svc_name:
             return
-        if self.show_timestamp:
-            line = f"{datetime.now().strftime('%H:%M:%S')} {line}"
-        self._log_widget.write_line(line)
+        line = self._stamp([line])[0]
+        self._log_widget.write_line(
+            line,
+            prefix=svc_name if self._all_mode else "",
+            prefix_style=self._svc_colors.get(svc_name) if self._all_mode else None,
+        )
 
     def append_logs(self, svc_name: str, lines: list[str]) -> None:
         """Append multiple log lines in a single UI refresh.
@@ -206,12 +243,16 @@ class LogPanel(Vertical):
             svc_name: Name of the service that produced the lines.
             lines: Raw log line texts.
         """
-        if self._svc_name != svc_name or not lines:
+        if not lines:
             return
-        if self.show_timestamp:
-            ts = datetime.now().strftime("%H:%M:%S")
-            lines = [f"{ts} {line}" for line in lines]
-        self._log_widget.write_lines(lines)
+        if not self._all_mode and self._svc_name != svc_name:
+            return
+        lines = self._stamp(lines)
+        self._log_widget.write_lines(
+            lines,
+            prefix=svc_name if self._all_mode else "",
+            prefix_style=self._svc_colors.get(svc_name) if self._all_mode else None,
+        )
 
     @on(Input.Changed, "#log-search")
     def on_search_changed(self, event: Input.Changed) -> None:

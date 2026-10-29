@@ -100,6 +100,7 @@ def load_config(yaml_path: Path) -> tuple[MusterConfig, list[Service]]:
                 group=group_id,
                 port=item.get("port"),
                 depends_on=item.get("depends_on", []),
+                restart=item.get("restart", "off"),
             )
         )
 

@@ -143,3 +143,37 @@ class TestStopReleasesPort:
         with socket.socket() as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind(("127.0.0.1", port))
+
+
+class TestAutoRestartRecovery:
+    """restart: on-failure recovers a service that crashes once."""
+
+    async def test_crash_then_recover(self, tmp_path):
+        marker = tmp_path / "crashed.once"
+        script = (
+            "import pathlib,sys,time;"
+            f"p=pathlib.Path({str(marker)!r});"
+            "(p.touch(), sys.exit(3)) if not p.exists() else time.sleep(60)"
+        )
+        svc = Service(
+            name="flappy",
+            cmd=f'{sys.executable} -c "{script}"',
+            group="backend",
+            restart="on-failure",
+        )
+        orch = _make_orchestrator({"flappy": svc})
+        orch.auto_restart_backoff = 0.1
+        try:
+            await asyncio.wait_for(orch.start(svc), timeout=30)
+
+            async def _poll() -> None:
+                # The ready event fires twice (first liveness failure, then
+                # recovery), so poll the status instead.
+                while svc.status != Status.RUNNING:
+                    await asyncio.sleep(0.2)
+
+            await asyncio.wait_for(_poll(), timeout=30)
+            assert svc.status == Status.RUNNING
+            assert svc.auto_restart_count == 1
+        finally:
+            await orch.stop(svc)

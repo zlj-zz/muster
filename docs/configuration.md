@@ -80,3 +80,21 @@ cmd:
   default: "npm run dev"                # explicit map
   test: "npm run test:watch"
 ```
+
+## `services[].restart`
+
+Crash restart policy — `off` (default) or `on-failure`.
+
+```yaml
+services:
+  - name: api
+    cmd: "go run main.go"
+    group: backend
+    restart: on-failure
+```
+
+With `on-failure`, muster restarts the service after an abnormal exit
+(non-zero code), up to 3 attempts with linear backoff. The attempt
+counter resets when the service reaches `RUNNING` again. Manual (`R`)
+and automatic restarts are counted separately (`restart_count` vs
+`auto_restart_count`).

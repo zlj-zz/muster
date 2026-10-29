@@ -88,6 +88,8 @@ services:
     group: infra
     port: 9102
     depends_on: []
+    # Auto-restart on crash (max 3 attempts, linear backoff).
+    restart: on-failure
 
   - name: user-service
     cmd:

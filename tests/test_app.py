@@ -408,3 +408,14 @@ class TestAppMisc:
             tree.highlight_service("api")
             await pilot.pause()
             await app._refresh_resources()
+
+
+class TestAppAllLogs:
+    async def test_a_key_shows_all_logs(self, minimal_app):
+        app = minimal_app
+        async with app.run_test() as pilot:
+            await pilot.press("a")
+            await pilot.pause()
+            log_panel = app.query_one("#log", LogPanel)
+            assert log_panel._all_mode
+            assert log_panel.border_title == "Logs: ALL services"

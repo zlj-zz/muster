@@ -302,3 +302,54 @@ class TestLogPanelHistoricalLoad:
 
             assert "live line" in _meta_text(panel)
             assert "disk line" not in _meta_text(panel)
+
+
+class TestAllMode:
+    """Interleaved all-services log view."""
+
+    @staticmethod
+    def _services():
+        api = Service(name="api", cmd="echo", group="backend")
+        api.log_lines.extend(["api line 1", "api line 2"])
+        web = Service(name="web", cmd="echo", group="frontend")
+        web.log_lines.extend(["web line 1"])
+        return [api, web]
+
+    async def test_set_all_mode_backfills_all_services(self):
+        panel = LogPanel()
+        app = WidgetTestApp(panel)
+        async with app.run_test() as pilot:
+            panel.set_all_mode(
+                self._services(), {"api": "#ff0000", "web": "#00ff00"}
+            )
+            await pilot.pause()
+            assert panel.border_title == "Logs: ALL services"
+            texts = _meta_text(panel)
+            assert "api line 1" in texts
+            assert "web line 1" in texts
+            metas = list(panel._log_widget._meta)
+            api_metas = [m for m in metas if m.prefix == "api"]
+            assert api_metas
+            assert all(m.prefix_style == "#ff0000" for m in api_metas)
+
+    async def test_append_log_in_all_mode_accepts_any_service(self):
+        panel = LogPanel()
+        app = WidgetTestApp(panel)
+        async with app.run_test() as pilot:
+            panel.set_all_mode([], {})
+            await pilot.pause()
+            panel.append_log("api", "live line")
+            await pilot.pause()
+            assert "live line" in _meta_text(panel)
+
+    async def test_set_service_exits_all_mode(self):
+        panel = LogPanel()
+        app = WidgetTestApp(panel)
+        async with app.run_test() as pilot:
+            panel.set_all_mode([], {})
+            panel.set_service(Service(name="api", cmd="echo", group="backend"))
+            await pilot.pause()
+            panel.append_log("web", "web line")
+            await pilot.pause()
+            assert not panel._all_mode
+            assert "web line" not in _meta_text(panel)

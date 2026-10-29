@@ -43,6 +43,7 @@ def validate_config(config: MusterConfig, services: list[Service]) -> list[str]:
     _validate_name_uniqueness(services)
     registry = {s.name: s for s in services}
     _validate_cmds(services)
+    _validate_restart(services)
     _validate_groups(services, config)
     _validate_dependencies(services, registry)
     _validate_cycles(registry)
@@ -50,6 +51,20 @@ def validate_config(config: MusterConfig, services: list[Service]) -> list[str]:
     warnings.extend(_validate_env_checks(config.env_checks))
 
     return warnings
+
+
+#: Allowed values for the per-service ``restart`` policy.
+_RESTART_POLICIES = {"off", "on-failure"}
+
+
+def _validate_restart(services: list[Service]) -> None:
+    """Reject unknown restart policies before the TUI starts."""
+    for svc in services:
+        if svc.restart not in _RESTART_POLICIES:
+            raise ConfigError(
+                f"service {svc.name!r}: invalid restart policy {svc.restart!r} "
+                f"(expected one of {sorted(_RESTART_POLICIES)})"
+            )
 
 
 def _validate_name_uniqueness(services: list[Service]) -> None:

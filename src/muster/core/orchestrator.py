@@ -63,6 +63,9 @@ class ServiceOrchestrator:
         self.health_timeout: int = 300
         self.layer_timeout: int = 300
         self.port_conflict_strategy: str = "kill"
+        self.max_auto_restarts: int = 3
+        self.auto_restart_backoff: float = 2.0
+        self._restart_attempts: dict[str, int] = {}
         self._reader_tasks: dict[str, asyncio.Task] = {}
         self._health_tasks: dict[str, asyncio.Task] = {}
         self._monitor_tasks: dict[str, asyncio.Task] = {}
@@ -448,10 +451,12 @@ class ServiceOrchestrator:
             svc: Service to restart.
             mode: Command mode key.
         """
-        svc.restart_count += 1
         await self.stop(svc)
         await asyncio.sleep(0.5)
         await self.start_with_deps(svc, mode)
+        # Count only successful restarts (was previously incremented blindly).
+        if svc.status == Status.RUNNING:
+            svc.restart_count += 1
 
     async def stop_all(self, services: list[Service]) -> None:
         """Stop all given services in parallel.
@@ -537,6 +542,7 @@ class ServiceOrchestrator:
                 self._notify(
                     f"{svc.name} process exited abnormally (code={returncode})", "error"
                 )
+                await self._maybe_auto_restart(svc, returncode)
         except asyncio.CancelledError:
             # Ensure the subprocess is reaped so it doesn't become a zombie.
             # If stop() has already sent SIGTERM/SIGKILL, this returns quickly.
@@ -548,6 +554,44 @@ class ServiceOrchestrator:
                 except asyncio.TimeoutError:
                     pass
             raise
+
+    async def _maybe_auto_restart(self, svc: Service, returncode: int) -> None:
+        """Auto-restart a crashed service per its ``restart`` policy.
+
+        Bounded retries with linear backoff keep a broken command from
+        flapping forever. The attempt counter resets when the service next
+        passes its health check (reaches ``RUNNING``).
+
+        Args:
+            svc: Service that just crashed.
+            returncode: The exit code that triggered the restart.
+        """
+        if svc.restart != "on-failure":
+            return
+        attempts = self._restart_attempts.get(svc.name, 0)
+        if attempts >= self.max_auto_restarts:
+            self._notify(
+                f"{svc.name} still failing after {attempts} auto-restarts, giving up",
+                "error",
+            )
+            return
+        self._restart_attempts[svc.name] = attempts + 1
+        svc.auto_restart_count += 1
+        delay = self.auto_restart_backoff * (attempts + 1)
+        self._log(
+            svc.name,
+            f"muster▸Auto-restarting in {delay:.1f}s "
+            f"(attempt {attempts + 1}/{self.max_auto_restarts})...",
+        )
+        await asyncio.sleep(delay)
+        # stop() during the backoff cancels this task; a manual start changes
+        # the status — both interventions cancel the pending restart.
+        if svc.status != Status.FAILED:
+            return
+        self._notify(f"Auto-restarting {svc.name}...", "information")
+        # Async re-entry: awaiting start() here would let this old monitor
+        # task overwrite the new _health_tasks bookkeeping.
+        asyncio.create_task(self.start(svc))
 
     async def _health_check(self, svc: Service) -> None:
         """Poll the service's TCP port until it accepts connections.
@@ -572,6 +616,7 @@ class ServiceOrchestrator:
                 async with self._get_lock(svc.name):
                     if svc.proc and svc.proc.returncode is None:
                         self._set_status(svc, Status.RUNNING)
+                        self._restart_attempts[svc.name] = 0
                     else:
                         self._set_status(svc, Status.FAILED)
                 svc._ready_event.set()
@@ -601,6 +646,8 @@ class ServiceOrchestrator:
                     sock.close()
                     async with self._get_lock(svc.name):
                         self._set_status(svc, Status.RUNNING)
+                    # A stable run refills the auto-restart budget.
+                    self._restart_attempts[svc.name] = 0
                     svc.port = port
                     svc._ready_event.set()
                     self._log(svc.name, f"muster▸Service ready (port {port})")

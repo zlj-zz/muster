@@ -59,6 +59,7 @@ services:
     group: frontend
     port: 3000
     depends_on: [api]
+    restart: on-failure
 ```
 
 Then run:
@@ -95,7 +96,9 @@ services:
 | `r` | Refresh environment status |
 | `t` | Cycle command mode |
 | `l` | Cycle group filter |
-| `1` / `2` / `3` | Switch to Svc / Env / Yaml tab |
+| `a` | Show all services' logs interleaved |
+| `?` | Help overlay (all shortcuts) |
+| `1` / `2` / `3` / `4` | Switch to Svc / Env / Yaml / Settings tab |
 | `ctrl+q` | Quit |
 
 ## Configuration Reference
@@ -180,6 +183,18 @@ cmd:
   default: "npm run dev"                # explicit map
   test: "npm run test:watch"
 ```
+
+### `services[].restart`
+
+Crash restart policy. Defaults to `off` (a crashed service stays FAILED).
+
+| Value | Behaviour |
+|-------|-----------|
+| `off` | No automatic restart |
+| `on-failure` | Auto-restart on abnormal exit (non-zero code); max 3 attempts with linear backoff; the attempt budget resets once the service passes its health check |
+
+Manual (`R`) and automatic restarts are counted separately
+(`restart_count` vs `auto_restart_count` in the detail panel/logs).
 
 ## Development
 

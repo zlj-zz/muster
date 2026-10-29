@@ -170,3 +170,30 @@ config:
 """)
         config, _ = load_config(path)
         assert config.port_discovery.enabled is False
+
+
+class TestLoadConfigRestart:
+    def test_restart_field_parsed(self, tmp_yaml):
+        path = tmp_yaml(
+            """
+services:
+  - name: api
+    cmd: "echo hi"
+    group: backend
+    restart: on-failure
+"""
+        )
+        _, services = load_config(path)
+        assert services[0].restart == "on-failure"
+
+    def test_restart_defaults_to_off(self, tmp_yaml):
+        path = tmp_yaml(
+            """
+services:
+  - name: api
+    cmd: "echo hi"
+    group: backend
+"""
+        )
+        _, services = load_config(path)
+        assert services[0].restart == "off"

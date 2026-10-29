@@ -112,9 +112,12 @@ class Service:
         group: Group ``id`` this service belongs to.
         port: Statically configured port (overrides auto-discovery).
         depends_on: Names of services that must start before this one.
+        restart: Crash restart policy — ``"off"`` (default) or ``"on-failure"``.
         status: Current runtime state (defaults to ``Status.STOPPED``).
         proc: Active ``asyncio`` subprocess handle.
         log_lines: Ring-buffer of the most recent log lines.
+        restart_count: Successful manual restarts.
+        auto_restart_count: Automatic restarts performed for ``on-failure``.
     """
 
     name: str
@@ -122,6 +125,7 @@ class Service:
     group: str
     port: int | None = None
     depends_on: list[str] = field(default_factory=list)
+    restart: str = "off"
 
     # runtime state
     status: Status = Status.STOPPED
@@ -129,6 +133,7 @@ class Service:
     log_lines: deque[str] = field(default_factory=lambda: deque(maxlen=2000))
     start_time: datetime | None = None
     restart_count: int = 0
+    auto_restart_count: int = 0
     last_error: str | None = None
     _ready_event: asyncio.Event = field(
         default_factory=asyncio.Event, repr=False, compare=False

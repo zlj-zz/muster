@@ -221,3 +221,61 @@ class TestLoadTodayLogs:
         lines = load_today_logs("api")
         assert len(lines) == 1
         assert "\\xff" in lines[0]
+
+
+class TestAutoRestart:
+    """Crash auto-restart policy (restart: on-failure)."""
+
+    @staticmethod
+    def _crashing_proc():
+        proc = MagicMock()
+        proc.wait = AsyncMock(return_value=1)
+        proc.returncode = 1
+        return proc
+
+    async def test_on_failure_schedules_restart(self):
+        svc = Service(
+            name="api", cmd="echo hi", group="backend", restart="on-failure"
+        )
+        svc.status = Status.RUNNING
+        svc.proc = self._crashing_proc()
+        orch = _make_orchestrator({"api": svc})
+        orch.auto_restart_backoff = 0
+        with patch.object(
+            ServiceOrchestrator, "start", new_callable=AsyncMock
+        ) as mock_start:
+            await asyncio.wait_for(orch._wait_process(svc), timeout=5)
+            await asyncio.sleep(0)  # pump the scheduled restart task
+            mock_start.assert_awaited_once()
+        assert svc.auto_restart_count == 1
+        assert orch._restart_attempts["api"] == 1
+
+    async def test_gives_up_after_max_attempts(self):
+        svc = Service(
+            name="api", cmd="echo hi", group="backend", restart="on-failure"
+        )
+        svc.status = Status.RUNNING
+        svc.proc = self._crashing_proc()
+        orch = _make_orchestrator({"api": svc})
+        orch.auto_restart_backoff = 0
+        orch._restart_attempts["api"] = orch.max_auto_restarts
+        with patch.object(
+            ServiceOrchestrator, "start", new_callable=AsyncMock
+        ) as mock_start:
+            await asyncio.wait_for(orch._wait_process(svc), timeout=5)
+            await asyncio.sleep(0)
+            mock_start.assert_not_awaited()
+        assert svc.auto_restart_count == 0
+
+    async def test_off_by_default(self):
+        svc = Service(name="api", cmd="echo hi", group="backend")
+        svc.status = Status.RUNNING
+        svc.proc = self._crashing_proc()
+        orch = _make_orchestrator({"api": svc})
+        with patch.object(
+            ServiceOrchestrator, "start", new_callable=AsyncMock
+        ) as mock_start:
+            await asyncio.wait_for(orch._wait_process(svc), timeout=5)
+            await asyncio.sleep(0)
+            mock_start.assert_not_awaited()
+        assert svc.auto_restart_count == 0
