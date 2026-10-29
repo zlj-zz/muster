@@ -65,3 +65,6 @@ design/
 
 # Screenshot previews
 mkdocs-*.png
+
+.pi/
+.pikb/
